@@ -1,0 +1,20 @@
+:root { color-scheme: dark; --background: #101113; --text: #f1f0ec; --muted: #a5a6ac; --accent: #c8f58b; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--background); color: var(--text); font-family: Arial, Helvetica, sans-serif; }
+main { max-width: 1180px; min-height: 100dvh; margin: auto; padding: 36px 48px; display: flex; flex-direction: column; }
+header, footer { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.brand { font-size: 26px; font-weight: 750; letter-spacing: -1.5px; }
+.dot { color: var(--accent); }
+.badge { border: 1px solid #34363b; border-radius: 20px; padding: 8px 12px; font-size: 10px; letter-spacing: 1.8px; color: var(--muted); }
+section { padding: 100px 0 80px; flex: 1; }
+.eyebrow { color: var(--accent); font-size: 11px; letter-spacing: 2px; }
+h1 { font-size: clamp(48px, 7vw, 86px); line-height: 1.05; letter-spacing: -4px; font-weight: 500; margin: 28px 0; }
+h1 span { color: #85868c; }
+.intro { color: var(--muted); max-width: 390px; line-height: 1.7; }
+.panel { margin-top: 64px; padding: 28px; background: #191a1e; border: 1px solid #303136; border-radius: 14px; display: flex; align-items: center; gap: 24px; }
+.symbol { font-size: 30px; color: var(--accent); }
+h2 { font-size: 17px; font-weight: 500; margin: 0 0 10px; }
+.panel p { font-size: 14px; color: var(--muted); line-height: 1.65; margin: 0; max-width: 520px; }
+.phase { margin-left: auto; white-space: nowrap; font-size: 11px; color: var(--muted); }
+footer { padding-top: 24px; border-top: 1px solid #2c2d32; font-size: 10px; letter-spacing: 1px; color: var(--muted); }
+@media (max-width: 640px) { main { padding: 24px; } section { padding-top: 68px; } h1 { letter-spacing: -2px; } .panel { align-items: flex-start; flex-wrap: wrap; gap: 16px; } .phase { margin-left: 0; } .badge { font-size: 8px; } }
