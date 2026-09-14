@@ -13,6 +13,7 @@ class Settings(BaseSettings):
 
     database_url: str = f"sqlite:///{(BACKEND_ROOT / 'music.db').as_posix()}"
     uploads_dir: Path = REPOSITORY_ROOT / "uploads"
+    max_upload_bytes: int = 250 * 1024 * 1024
     cors_origins: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
 
 

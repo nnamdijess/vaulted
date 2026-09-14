@@ -1,1 +1,1 @@
-"""Request and response schemas will be added with music routes."""
+"""Validated music request and response schemas."""

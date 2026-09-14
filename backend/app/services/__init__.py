@@ -1,1 +1,1 @@
-"""Music and local storage operations will live here."""
+"""Local audio storage operations."""
