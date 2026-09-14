@@ -1,0 +1,50 @@
+# Dependencies and Python environments
+node_modules/
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+# Secrets and machine-specific configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+# Databases (including SQLite journals)
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+# Local media
+/uploads/*
+!/uploads/.gitkeep
+*.mp3
+*.wav
+*.flac
+*.m4a
+*.aac
+*.ogg
+*.aiff
+*.aif
+*.opus
+# Build and tooling output
+.next/
+out/
+dist/
+build/
+coverage/
+htmlcov/
+.coverage*
+*.tsbuildinfo
+*.log
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
