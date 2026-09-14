@@ -35,7 +35,7 @@ From the repository root, create the backend environment:
 
 ```powershell
 python -m venv backend/.venv
-backend/.venv/Scripts/python.exe -m pip install -r backend/requirements.txt
+backend/.venv/Scripts/python.exe -m pip install -r backend/requirements-lock.txt
 Copy-Item backend/.env.example backend/.env
 ```
 
@@ -80,6 +80,9 @@ Invoke-RestMethod http://127.0.0.1:8000/api/health
 ## Configuration and future work
 
 Backend configuration comes from `backend/.env` or process environment variables.
+`requirements.txt` declares direct dependency ranges; `requirements-lock.txt` records
+the exact versions verified on Windows with Python 3.12. Update both deliberately
+when upgrading dependencies. The frontend uses `package-lock.json` with `npm ci`.
 The default SQLite file is `backend/music.db`; the default media root is `uploads/`.
 Paths resolve from the repository, not from the terminal working directory.
 `DATABASE_URL` can later select PostgreSQL after installing its driver and adding
