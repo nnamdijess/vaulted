@@ -44,6 +44,9 @@ htmlcov/
 .coverage*
 *.tsbuildinfo
 *.log
+.e2e-data/
+test-results/
+playwright-report/
 .DS_Store
 Thumbs.db
 .idea/
