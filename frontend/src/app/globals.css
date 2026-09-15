@@ -121,3 +121,7 @@ select { padding: 10px; border: 1px solid var(--border); border-radius: 8px; fon
 .insight-totals strong { display: block; font-size: 40px; }
 .modal li { line-height: 1.8; overflow-wrap: anywhere; }
 .download-link { text-align: center; font-size: 20px; }
+.auth-panel { max-width: 420px; margin: 4rem auto; }
+.auth-panel form { display: grid; gap: 1.25rem; }
+.auth-panel label { display: grid; gap: .5rem; }
+.account-area { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; margin-bottom: .75rem; font-size: .85rem; }

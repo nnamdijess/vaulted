@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { AudioPlayerProvider } from "@/components/audio-player";
 import { ThemeProvider } from "@/components/theme-provider";
+import { AuthProvider } from "@/components/auth-provider";
 
 export const metadata: Metadata = {
   title: "Unreleased",
@@ -9,5 +10,5 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return <html lang="en"><body><ThemeProvider><AudioPlayerProvider>{children}</AudioPlayerProvider></ThemeProvider></body></html>;
+  return <html lang="en"><body><ThemeProvider><AuthProvider><AudioPlayerProvider>{children}</AudioPlayerProvider></AuthProvider></ThemeProvider></body></html>;
 }

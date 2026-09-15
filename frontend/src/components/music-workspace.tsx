@@ -10,8 +10,13 @@ import { SongActions } from "./song-actions";
 import { ProjectActions, ProjectAction } from "./project-actions";
 import { ProjectCover } from "./project-cover";
 import { ThemeSwitch } from "./theme-provider";
+import { AccountArea, PrivateArea } from './auth-provider';
 
 export function MusicWorkspace({ projectId, songId }: { projectId?: string; songId?: string }) {
+  return <PrivateArea><WorkspaceContent projectId={projectId} songId={songId} /></PrivateArea>;
+}
+
+function WorkspaceContent({ projectId, songId }: { projectId?: string; songId?: string }) {
   const [projectAction, setProjectAction] = useState<ProjectAction | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [project, setProject] = useState<Project | null>(null);
@@ -85,7 +90,7 @@ export function MusicWorkspace({ projectId, songId }: { projectId?: string; song
   }
 
   return <main>
-    <header><Link href="/" className="brand">unreleased<span className="dot">.</span></Link><ThemeSwitch /></header>
+    <header><Link href="/" className="brand">unreleased<span className="dot">.</span></Link><div><AccountArea /><ThemeSwitch /></div></header>
     <nav aria-label="Breadcrumb"><Link href="/projects">Library</Link>{project && <> / <Link href={`/projects/${project.id}`}>{project.name}</Link></>}{song && <> / <span>{song.title}</span></>}</nav>
     {error && <div className="error" role="alert">{error} <button onClick={() => { setError(""); setLoading(true); setRevision((value) => value + 1); }}>Retry</button></div>}
     {notice && <p className="notice" role="status">{notice}</p>}
