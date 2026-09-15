@@ -12,6 +12,7 @@ def upgrade_local_database(engine: Engine) -> None:
         if "artist" not in project_columns:
             connection.exec_driver_sql("ALTER TABLE projects ADD COLUMN artist VARCHAR(200) NOT NULL DEFAULT ''")
         for name, definition in {
+            "owner_id": "INTEGER REFERENCES users(id)",
             "cover_path": "VARCHAR(255)", "notes": "TEXT NOT NULL DEFAULT ''",
             "share_token": "VARCHAR(100)", "sharing_enabled": "BOOLEAN NOT NULL DEFAULT 0",
             "allow_downloads": "BOOLEAN NOT NULL DEFAULT 0",
@@ -19,6 +20,7 @@ def upgrade_local_database(engine: Engine) -> None:
             if name not in project_columns:
                 connection.exec_driver_sql(f"ALTER TABLE projects ADD COLUMN {name} {definition}")
         connection.exec_driver_sql("CREATE UNIQUE INDEX IF NOT EXISTS ix_projects_share_token ON projects (share_token)")
+        connection.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_projects_owner_id ON projects (owner_id)")
         song_columns = {column["name"] for column in inspect(connection).get_columns("songs")}
         if "position" not in song_columns:
             connection.exec_driver_sql("ALTER TABLE songs ADD COLUMN position INTEGER NOT NULL DEFAULT 1")

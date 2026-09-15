@@ -3,20 +3,24 @@ import secrets
 from datetime import timezone
 from typing import Annotated
 
-from fastapi import APIRouter, File, HTTPException, Response, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 
-from app.api.music import Database, lock_track_order, require_record, stream_audio
-from app.models.music import ListenEvent, Project, Song
+from app.api.music import Database, lock_track_order, require_record, audio_response
+from app.models.music import ListenEvent, Project, Song, SongVersion
 from app.schemas.music import ProjectRead
 from app.schemas.project_features import ListenCreate, NotesUpdate, ProjectUpdate, ShareUpdate, TrackOrder
 from app.services.artwork import COVER_TYPES, save_cover
 from app.services.storage import audio_path
 
 router = APIRouter(tags=['project features'])
+from app.db.session import get_session
+from sqlalchemy.orm import Session
+PublicDatabase = Annotated[Session, Depends(get_session)]
+
 public_router = APIRouter(prefix='/public', tags=['public sharing'])
 
 
@@ -147,7 +151,7 @@ def shared_song(db, token, song_id):
 
 
 @public_router.get('/{token}')
-def public_project(token: str, db: Database):
+def public_project(token: str, db: PublicDatabase):
     project = shared_project(db, token)
     songs = db.scalars(select(Song).options(selectinload(Song.versions)).where(Song.project_id == project.id).order_by(Song.position, Song.id)).all()
     # Explicit allowlist: never serialize owner schemas, notes, file paths or tokens.
@@ -158,18 +162,18 @@ def public_project(token: str, db: Database):
 
 
 @public_router.get('/{token}/cover')
-def public_cover(token: str, db: Database):
+def public_cover(token: str, db: PublicDatabase):
     return cover_response(shared_project(db, token))
 
 
 @public_router.get('/{token}/songs/{song_id}/audio')
-def public_audio(token: str, song_id: int, db: Database, download: bool = False):
+def public_audio(token: str, song_id: int, db: PublicDatabase, download: bool = False):
     project, song = shared_song(db, token, song_id)
     if download and not project.allow_downloads:
         raise HTTPException(403, 'Downloads are disabled for this project')
     if song.latest_version_id is None:
         raise HTTPException(404, 'Audio not found')
-    response = stream_audio(song.latest_version_id, db, download)
+    response = audio_response(db.get(SongVersion, song.latest_version_id), download)
     response.headers['Cache-Control'] = 'no-store'
     return response
 
@@ -198,7 +202,7 @@ def owner_listen(song_id: int, data: ListenCreate, db: Database):
 
 
 @public_router.post('/{token}/songs/{song_id}/listens')
-def public_listen(token: str, song_id: int, data: ListenCreate, db: Database):
+def public_listen(token: str, song_id: int, data: ListenCreate, db: PublicDatabase):
     _, song = shared_song(db, token, song_id)
     return record_listen(db, song, data, 'shared')
 

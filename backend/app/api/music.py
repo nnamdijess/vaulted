@@ -7,30 +7,38 @@ from pydantic import ValidationError
 from sqlalchemy import delete, func, select, text
 from sqlalchemy.orm import Session, selectinload
 
-from app.db.session import get_session
+from app.api.auth import owned_session
 from app.models.music import ListenEvent, Project, Song, SongVersion
 from app.schemas.music import ProjectCreate, ProjectRead, SongCreate, SongRead, SongUpdate, VersionCreate, VersionRead
 from app.services.storage import AUDIO_TYPES, audio_path, save_audio
 
 router = APIRouter()
-Database = Annotated[Session, Depends(get_session)]
+Database = Annotated[Session, Depends(owned_session)]
 
 
 def require_record(db: Session, model, record_id: int):
     record = db.get(model, record_id)
     if record is None:
         raise HTTPException(404, f"{model.__name__} not found")
+    if model is Project:
+        project = record
+    elif model is Song:
+        project = record.project
+    else:
+        project = record.song.project
+    if project is None or project.owner_id != db.info.get('owner_id') or project.owner_id is None:
+        raise HTTPException(404, f"{model.__name__} not found")
     return record
 
 
 @router.get("/projects", response_model=list[ProjectRead], tags=["projects"])
 def list_projects(db: Database):
-    return db.scalars(select(Project).order_by(Project.id.desc())).all()
+    return db.scalars(select(Project).where(Project.owner_id == db.info['owner_id']).order_by(Project.id.desc())).all()
 
 
 @router.post("/projects", response_model=ProjectRead, status_code=201, tags=["projects"])
 def create_project(data: ProjectCreate, db: Database):
-    project = Project(**data.model_dump())
+    project = Project(owner_id=db.info['owner_id'], **data.model_dump())
     db.add(project)
     db.commit()
     db.refresh(project)
@@ -161,6 +169,10 @@ def create_version(
 @router.get("/versions/{version_id}/audio", response_class=FileResponse, tags=["versions"])
 def stream_audio(version_id: int, db: Database, download: bool = False):
     version = require_record(db, SongVersion, version_id)
+    return audio_response(version, download)
+
+
+def audio_response(version, download=False):
     path = audio_path(version.file_path)
     if not path.is_file():
         raise HTTPException(404, "Audio file not found")
