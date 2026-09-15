@@ -23,7 +23,7 @@ playback and optional downloads. It uses the same persistent player and theme sw
 - Public UI: `frontend/src/app/share/[token]/page.tsx` and `components/shared-project.tsx`.
 - Player and counting: `components/audio-player.tsx`, `src/lib/playback-insights.ts`.
 - Themes: `components/theme-provider.tsx`, `app/layout.tsx`, `app/globals.css`.
-- Same-origin public API proxy: `frontend/next.config.ts`.
+- Same-origin API proxy: `frontend/next.config.ts`.
 - Tests: `frontend/tests/project-features.spec.ts`, `tests/music.spec.ts`,
   `tests/fixtures.ts`, `playwright.config.ts`, and `backend/tests/test_migrations.py`.
 
@@ -84,19 +84,12 @@ Revoked/disabled tokens return 404, and public responses specify `Cache-Control:
 no-store`. Already downloaded/buffered audio cannot be recalled. Allow downloads
 controls explicit downloads; it is not DRM and cannot prevent saving streamed audio.
 
-The owner app remains unauthenticated and is intended for the local owner. **Keep
-FastAPI bound to 127.0.0.1; do not expose the private backend port or proxy `/api/*`
-wholesale.** The frontend forwards only `/api/public/*` to the internal backend.
-`API_INTERNAL_URL` (server-only) defaults to `http://127.0.0.1:8000`. Shared pages use
-same-origin public requests, so listeners never need the backend's private address.
-
-A link copied from localhost works only on that machine. For friends to use links,
-serve the Next.js frontend at a reachable hostname, preferably HTTPS, and open the
-project using that hostname before copying its link. Keep the backend loopback-only.
-This change does not publish the app or configure a domain, TLS, router, or tunnel.
-For a LAN frontend after building, `npx.cmd next start --hostname 0.0.0.0 --port 3000`
-is available; HTTPS is recommended for Internet hosting. Do not expose owner API
-routes when configuring a reverse proxy. A production owner login is future work.
+Owner pages and APIs now require an authenticated account and verify project
+ownership. Next.js forwards `/api/*` to the internal FastAPI backend; public share
+routes remain token-authorized and anonymous. See [authentication and ownership](authentication.md)
+for cookie settings, explicit legacy ownership migration, and HTTPS requirements.
+A localhost share link works only on that machine; friends need a reachable frontend
+hostname. This implementation does not deploy the app or configure TLS or a tunnel.
 Use `--no-access-log` with Uvicorn and configure proxy logs appropriately if you
 want share URLs and visitor IPs excluded from infrastructure access logs.
 

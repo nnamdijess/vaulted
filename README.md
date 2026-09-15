@@ -11,7 +11,7 @@ details, public-hosting boundaries, counting rules, hydration findings and tests
 Upload-first MVP: create a project, add multiple audio tracks, edit details later,
 and listen to the project in a persistent sequential player. Next.js with
 TypeScript calls a FastAPI API backed by SQLAlchemy, SQLite and local audio files.
-No Docker or authentication is included at this stage. Run locally on loopback only.
+Account authentication and user ownership are included. See [authentication setup](docs/authentication.md), especially the explicit command for claiming existing projects. No Docker is included.
 
 ## Structure
 
@@ -107,7 +107,7 @@ preserved as metadata. `MAX_UPLOAD_BYTES` defaults to 262144000 (250 MiB).
 
 ## Try the full flow
 
-1. Start both servers using the commands above and open http://localhost:3000.
+1. Start both servers using the commands above and open http://localhost:3000. Register or log in; claim legacy projects using the authentication guide if needed.
 2. Click **New Project**, enter a name and optional artist/owner and description.
 3. Open the album-style project and click **Add Tracks**. Choose one or multiple
    WAV, MP3, M4A, FLAC, AAC, OGG, OPUS or AIFF files, then **Upload tracks**.
@@ -182,8 +182,8 @@ From `backend/`, run the legacy database preservation test:
 - No drag-and-drop reordering or editing existing version notes yet. Project menus support
   sorting, settings, notes, artwork, insights, sharing and deletion.
 - Play queues are snapshots. Press Play All again to include new uploads or latest versions.
-- The owner interface has no login and must remain private. Share pages are read-only
-  token links; expose only the frontend and its public API proxy, not the owner backend.
+- Private workspaces require login. Share pages remain anonymous read-only token links.
+  Future hosting requires HTTPS and secure cookies; see the authentication guide.
 - No transcoding or audio-content inspection: extensions are checked, and media
   types are inferred from them. Codec support depends on the browser; PCM WAV and
   MP3 are good choices for the first test.

@@ -13,3 +13,19 @@ export function wav() {
 }
 
 export const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAFElEQVR4nGPMn+3GgA0wYRUdtBIACyABYBEIOtMAAAAASUVORK5CYII=', 'base64');
+
+
+import { test as base, expect } from '@playwright/test';
+import { randomUUID } from 'node:crypto';
+
+// Each regression test owns an isolated account, shared by API and browser fixtures.
+export const test = base.extend<{ ownerAccount: void }>({
+  ownerAccount: [async ({ request, context }, use) => {
+    const response = await request.post('http://127.0.0.1:8011/api/auth/register', {
+      data: { email: `regression-${randomUUID()}@example.com`, password: 'Test-only-password-42', display_name: 'Test owner' },
+    });
+    expect(response.status()).toBe(201);
+    await context.addCookies((await request.storageState()).cookies);
+    await use();
+  }, { auto: true }],
+});

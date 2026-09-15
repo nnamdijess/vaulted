@@ -1,4 +1,5 @@
-import { expect, test } from '@playwright/test';
+import { expect } from '@playwright/test';
+import { test } from './fixtures';
 import { randomUUID } from 'node:crypto';
 import { wav, png } from './fixtures';
 import { streamThreshold } from '../src/lib/playback-insights';
