@@ -59,6 +59,8 @@ class ProjectRead(Record):
     name: str
     description: str
     artist: str
+    cover_path: str | None
+    notes: str
 
 
 class SongRead(Record):

@@ -4,11 +4,11 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import ValidationError
-from sqlalchemy import func, select, text
+from sqlalchemy import delete, func, select, text
 from sqlalchemy.orm import Session, selectinload
 
 from app.db.session import get_session
-from app.models.music import Project, Song, SongVersion
+from app.models.music import ListenEvent, Project, Song, SongVersion
 from app.schemas.music import ProjectCreate, ProjectRead, SongCreate, SongRead, SongUpdate, VersionCreate, VersionRead
 from app.services.storage import AUDIO_TYPES, audio_path, save_audio
 
@@ -114,6 +114,7 @@ def update_song(song_id: int, data: SongUpdate, db: Database):
 def delete_song(song_id: int, db: Database):
     song = require_record(db, Song, song_id)
     paths = [audio_path(version.file_path) for version in song.versions]
+    db.execute(delete(ListenEvent).where(ListenEvent.song_id == song_id))
     db.delete(song)
     db.commit()
     # Metadata deletion must commit before removing any irreplaceable files.

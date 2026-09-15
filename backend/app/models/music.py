@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, ForeignKey, String, Text
+from sqlalchemy import DateTime, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
@@ -17,6 +17,11 @@ class Project(Base):
     name: Mapped[str] = mapped_column(String(200))
     description: Mapped[str] = mapped_column(Text, default="")
     artist: Mapped[str] = mapped_column(String(200), default="")
+    cover_path: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    notes: Mapped[str] = mapped_column(Text, default="")
+    share_token: Mapped[str | None] = mapped_column(String(100), nullable=True, unique=True)
+    sharing_enabled: Mapped[bool] = mapped_column(default=False)
+    allow_downloads: Mapped[bool] = mapped_column(default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     songs: Mapped[list["Song"]] = relationship(back_populates="project", cascade="all, delete-orphan")
 
@@ -53,3 +58,16 @@ class SongVersion(Base):
     notes: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     song: Mapped[Song] = relationship(back_populates="versions")
+
+
+class ListenEvent(Base):
+    __tablename__ = "listen_events"
+    __table_args__ = (UniqueConstraint("playback_id", name="uq_listen_playback"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), index=True)
+    song_id: Mapped[int] = mapped_column(ForeignKey("songs.id"), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    source: Mapped[str] = mapped_column(String(10))
+    session_id: Mapped[str] = mapped_column(String(36))
+    playback_id: Mapped[str] = mapped_column(String(36))

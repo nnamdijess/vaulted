@@ -21,6 +21,7 @@ class MigrationTest(unittest.TestCase):
             upgrade_local_database(engine)
             upgrade_local_database(engine)
             with engine.connect() as connection:
+                self.assertEqual(connection.execute(text("SELECT cover_path, notes, share_token, sharing_enabled, allow_downloads FROM projects")).one(), (None, '', None, 0, 0))
                 self.assertEqual(connection.execute(text("SELECT id, position FROM songs ORDER BY position")).all(), [(2, 1), (1, 2)])
                 self.assertEqual(connection.execute(text("SELECT title, artist, bpm, notes FROM songs WHERE id=1")).one(), ('First', 'Artist', 120, 'Keep notes'))
                 self.assertEqual(connection.execute(text("SELECT song_id, file_path, notes FROM song_versions")).one(), (1, 'existing.wav', 'Version notes'))
