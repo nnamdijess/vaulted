@@ -105,6 +105,9 @@ test('artwork and notes dialogs, shared listening without owner controls, insigh
   await expect.poll(() => friend.getByTestId('global-audio').evaluate((audio: HTMLAudioElement) => audio.ended)).toBe(true);
   expect((await (await request.get(`${api}/projects/${project.id}/insights`)).json()).total).toBe(0);
   await friend.getByRole('button', { name: 'Play All' }).click();
+  const sharedCover = friend.getByRole('complementary', { name: 'Audio player' }).getByRole('img', { name: 'Cover for Listen once' });
+  await expect(sharedCover).toBeVisible();
+  await expect.poll(() => sharedCover.evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
   await friend.getByRole('button', { name: 'Pause playback', exact: true }).click();
   await friend.getByRole('button', { name: 'Resume playback', exact: true }).click();
   await expect.poll(async () => (await (await request.get(`${api}/projects/${project.id}/insights`)).json()).total).toBe(1);
@@ -135,6 +138,9 @@ test('artwork and notes dialogs, shared listening without owner controls, insigh
   await page.getByRole('button', { name: 'Close dialog' }).click();
   await page.getByTestId('global-audio').evaluate((audio: HTMLAudioElement) => { audio.muted = true; });
   await page.getByRole('button', { name: 'Play All' }).click();
+  const ownerCover = page.getByRole('complementary', { name: 'Audio player' }).getByRole('img', { name: 'Cover for Listen once' });
+  await expect(ownerCover).toBeVisible();
+  await expect.poll(() => ownerCover.evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
   await page.getByRole('button', { name: 'Project actions', exact: true }).click();
   await page.getByRole('button', { name: 'Delete project', exact: true }).click();
   await page.getByRole('button', { name: 'Delete project permanently', exact: true }).click();

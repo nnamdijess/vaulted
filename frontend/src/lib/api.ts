@@ -8,6 +8,10 @@ export function apiUrl(path: string) {
   return `${API_BASE_URL.replace(/\/$/, "")}/api${path}`;
 }
 
+export function projectCoverUrl(project?: Project | null): string | undefined {
+  return project?.cover_path ? apiUrl(`/projects/${project.id}/cover?v=${encodeURIComponent(project.cover_path)}`) : undefined;
+}
+
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response;
   try {

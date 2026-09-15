@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { api, postJson, Project, Song, Version } from "@/lib/api";
+import { api, postJson, Project, projectCoverUrl, Song, Version } from "@/lib/api";
 import { QueueTrack, trackFor, usePlayer } from "./audio-player";
 import { Modal } from "./modal";
 import { SongActions } from "./song-actions";
@@ -78,7 +78,7 @@ export function MusicWorkspace({ projectId, songId }: { projectId?: string; song
     setNotice("Song deleted.");
     if (songId && project) router.push(`/projects/${project.id}`);
   }
-  const queue = songs.map(trackFor).filter((track): track is QueueTrack => track !== null);
+  const queue = songs.map((item) => trackFor(item, project)).filter((track): track is QueueTrack => track !== null);
   function playSong(item: Song) {
     if (player.current?.songId === item.id && player.current.versionId === item.latest_version_id) player.toggle();
     else player.playQueue(queue, queue.findIndex((track) => track.songId === item.id));
@@ -97,7 +97,7 @@ export function MusicWorkspace({ projectId, songId }: { projectId?: string; song
       <div className="version-list">{versions.map((version) => <article className="version-row" key={version.id}>
         <button className="row-play" aria-label={`Play ${version.version_name}`} onClick={() => {
           if (player.current?.versionId === version.id) player.toggle();
-          else player.playQueue([{ songId: song.id, title: song.title, artist: song.artist, versionId: version.id }]);
+          else player.playQueue([{ songId: song.id, title: song.title, artist: song.artist, versionId: version.id, projectId: song.project_id, coverUrl: projectCoverUrl(project) }]);
         }}>{player.current?.versionId === version.id && player.playing ? "Ⅱ" : "▶"}</button>
         <div><h3>{version.version_name}</h3><p className="muted">{version.original_filename} · {new Date(version.created_at).toLocaleDateString()}</p>{version.notes && <p className="notes">{version.notes}</p>}</div>
       </article>)}</div>
@@ -105,7 +105,7 @@ export function MusicWorkspace({ projectId, songId }: { projectId?: string; song
     </> : projectId ? project && <>
       <section className="album-header">
         <ProjectCover project={project} onClick={() => setProjectAction("Change cover")} />
-        <div><div className="project-heading"><p className="eyebrow">PROJECT</p><ProjectActions project={project} songs={songs} action={projectAction} setAction={setProjectAction} onChange={setProject} onSort={() => setRevision((value) => value + 1)} /></div><h1>{project.name}</h1><p className="album-subtitle">{project.artist || "Your library"} <span>· {songs.length} {songs.length === 1 ? "track" : "tracks"}</span></p>
+        <div><div className="project-heading"><p className="eyebrow">PROJECT</p><ProjectActions project={project} songs={songs} action={projectAction} setAction={setProjectAction} onChange={(updated) => { setProject(updated); player.updateProject(updated); }} onSort={() => setRevision((value) => value + 1)} /></div><h1>{project.name}</h1><p className="album-subtitle">{project.artist || "Your library"} <span>· {songs.length} {songs.length === 1 ? "track" : "tracks"}</span></p>
           {project.description && <p className="description">{project.description}</p>}
           <div className="album-buttons"><button disabled={!queue.length} onClick={() => player.playQueue(queue)}>▶ Play All</button><button className="secondary" onClick={() => openDialog("tracks")}>＋ Add Tracks</button></div>
         </div>

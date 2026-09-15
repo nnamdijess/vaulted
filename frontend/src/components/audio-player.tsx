@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { createContext, useContext, useRef, useState } from "react";
-import { apiUrl, Song } from "@/lib/api";
+import { apiUrl, Project, projectCoverUrl, Song } from "@/lib/api";
 import { usePlaybackInsights } from "@/lib/playback-insights";
 
-export type QueueTrack = { songId: number; title: string; artist: string; versionId: number; publicToken?: string };
-export function trackFor(song: Song): QueueTrack | null {
-  return song.latest_version_id ? { songId: song.id, title: song.title, artist: song.artist, versionId: song.latest_version_id } : null;
+export type QueueTrack = { songId: number; title: string; artist: string; versionId: number; publicToken?: string; projectId?: number; coverUrl?: string };
+export function trackFor(song: Song, project?: Project | null): QueueTrack | null {
+  return song.latest_version_id ? { songId: song.id, title: song.title, artist: song.artist, versionId: song.latest_version_id, projectId: song.project_id, coverUrl: projectCoverUrl(project) } : null;
 }
 
 type Player = {
@@ -16,6 +16,7 @@ type Player = {
   playQueue: (tracks: QueueTrack[], index?: number) => void;
   toggle: () => void;
   updateSong: (song: Song) => void;
+  updateProject: (project: Project) => void;
   removeSong: (songId: number) => void;
   removeSongs: (songIds: number[]) => void;
 };
@@ -27,6 +28,15 @@ export function usePlayer() {
 }
 function clock(seconds: number) {
   return `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, "0")}`;
+}
+
+function PlayerArtwork({ src, title }: { src?: string; title: string }) {
+  const [failed, setFailed] = useState(false);
+  return <span className="mini-cover">{src && !failed
+    // Uploaded artwork uses the same owner/token-scoped URL as its project.
+    // eslint-disable-next-line @next/next/no-img-element
+    ? <img src={src} alt={`Cover for ${title}`} onError={() => setFailed(true)} />
+    : <span aria-hidden="true">♫</span>}</span>;
 }
 
 export function AudioPlayerProvider({ children }: { children: React.ReactNode }) {
@@ -78,6 +88,11 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
     queueRef.current = queueRef.current.map((track) => track.songId === song.id ? { ...track, title: song.title, artist: song.artist } : track);
     setQueue(queueRef.current);
   }
+  function updateProject(project: Project) {
+    queueRef.current = queueRef.current.map((track) => track.projectId === project.id && !track.publicToken
+      ? { ...track, coverUrl: projectCoverUrl(project) } : track);
+    setQueue(queueRef.current);
+  }
   function removeSong(songId: number) {
     removeSongs([songId]);
   }
@@ -100,7 +115,7 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
     }
   }
 
-  return <Context.Provider value={{ current, playing, playQueue, toggle, updateSong, removeSong, removeSongs }}>
+  return <Context.Provider value={{ current, playing, playQueue, toggle, updateSong, updateProject, removeSong, removeSongs }}>
     {children}
     <aside className="audio-dock" aria-label="Audio player">
       <audio ref={audio} data-testid="global-audio" preload="metadata"
@@ -111,7 +126,7 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
         onDurationChange={() => setDuration(Number.isFinite(audio.current?.duration) ? audio.current!.duration : 0)}
         onEnded={() => { setPlaying(false); move(1); }}
         onError={() => { setPlaying(false); setError("Unable to play this file. Check the backend and browser codec support."); }} />
-      <div className="now-playing"><span className="mini-cover" aria-hidden="true">♫</span><div>
+      <div className="now-playing"><PlayerArtwork key={current?.coverUrl ?? 'placeholder'} src={current?.coverUrl} title={current?.title ?? 'current track'} /><div>
         {current ? <Link href={current.publicToken ? `/share/${current.publicToken}` : `/songs/${current.songId}`}>{current.title}</Link> : <strong>Nothing playing</strong>}
         <small>{current?.artist || (current ? "Unreleased" : "Choose a track to listen")}</small>
       </div></div>
