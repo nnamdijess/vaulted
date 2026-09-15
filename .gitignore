@@ -36,6 +36,8 @@ __pycache__/
 *.opus
 # Build and tooling output
 .next/
+.next-e2e/
+.next-verify/
 out/
 dist/
 build/

@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
-import { api, apiUrl, postJson, Project, Song, Version } from "@/lib/api";
-
-function message(error: unknown) { return error instanceof Error ? error.message : "Something went wrong. Please try again."; }
+import { useRouter } from "next/navigation";
+import { api, postJson, Project, Song, Version } from "@/lib/api";
+import { QueueTrack, trackFor, usePlayer } from "./audio-player";
+import { Modal } from "./modal";
+import { SongActions } from "./song-actions";
 
 export function MusicWorkspace({ projectId, songId }: { projectId?: string; songId?: string }) {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -14,9 +16,13 @@ export function MusicWorkspace({ projectId, songId }: { projectId?: string; song
   const [versions, setVersions] = useState<Version[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
-  const [retry, setRetry] = useState(0);
+  const [dialog, setDialog] = useState<"project" | "tracks" | null>(null);
+  const [dialogError, setDialogError] = useState("");
+  const [revision, setRevision] = useState(0);
+  const player = usePlayer();
+  const router = useRouter();
 
   useEffect(() => {
     let active = true;
@@ -33,85 +39,93 @@ export function MusicWorkspace({ projectId, songId }: { projectId?: string; song
           const nextProjects = await api<Project[]>("/projects");
           if (active) setProjects(nextProjects);
         }
-      } catch (err) { if (active) setError(message(err)); }
+      } catch (err) { if (active) setError(err instanceof Error ? err.message : "Unable to load your library."); }
       finally { if (active) setLoading(false); }
     }
     void load();
     return () => { active = false; };
-  }, [projectId, songId, retry]);
+  }, [projectId, songId, revision]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = event.currentTarget;
-    const data = new FormData(form);
-    const value = (key: string) => String(data.get(key) ?? "").trim();
-    setSaving(true); setError(""); setNotice("");
+    const data = new FormData(event.currentTarget);
+    setBusy(true); setDialogError("");
     try {
-      if (songId) {
-        const version = await api<Version>(`/songs/${songId}/versions`, { method: "POST", body: data });
-        setVersions((items) => [version, ...items]);
-        setNotice("Audio version uploaded.");
-      } else if (projectId) {
-        const created = await api<Song>(`/projects/${projectId}/songs`, postJson({ title: value("title"), artist: value("artist"), bpm: value("bpm") ? Number(value("bpm")) : null, key: value("key"), status: value("status"), notes: value("notes") }));
-        setSongs((items) => [created, ...items]);
-        setNotice("Song created. Open it to upload a version.");
+      if (dialog === "tracks") {
+        const created = await api<Song[]>(`/projects/${projectId}/tracks`, { method: "POST", body: data });
+        setSongs((items) => [...items, ...created].sort((a, b) => a.position - b.position || a.id - b.id));
+        setNotice(`${created.length} ${created.length === 1 ? "track" : "tracks"} added.`);
       } else {
-        const created = await api<Project>("/projects", postJson({ name: value("name"), description: value("description") }));
-        setProjects((items) => [created, ...items]);
-        setNotice("Project created.");
+        const project = await api<Project>("/projects", postJson(Object.fromEntries(data)));
+        setProjects((items) => [project, ...items]);
+        setNotice("Project created. Open it to add tracks.");
       }
-      form.reset();
-    } catch (err) { setError(message(err)); }
-    finally { setSaving(false); }
+      setDialog(null);
+    } catch (err) { setDialogError(err instanceof Error ? err.message : "Upload failed. Please try again."); }
+    finally { setBusy(false); }
+  }
+  function openDialog(value: "project" | "tracks") { setDialogError(""); setDialog(value); }
+  function onChange(updated: Song) {
+    setSongs((items) => items.map((item) => item.id === updated.id ? updated : item));
+    if (songId) { setSong(updated); setRevision((value) => value + 1); }
+  }
+  function onDelete(id: number) {
+    setSongs((items) => items.filter((item) => item.id !== id));
+    setNotice("Song deleted.");
+    if (songId && project) router.push(`/projects/${project.id}`);
+  }
+  const queue = songs.map(trackFor).filter((track): track is QueueTrack => track !== null);
+  function playSong(item: Song) {
+    if (player.current?.songId === item.id && player.current.versionId === item.latest_version_id) player.toggle();
+    else player.playQueue(queue, queue.findIndex((track) => track.songId === item.id));
   }
 
-  return (
-    <main>
-      <header><Link href="/" className="brand">unreleased<span className="dot">.</span></Link><span className="badge">LOCAL WORKSPACE</span></header>
-      <nav aria-label="Breadcrumb"><Link href="/projects">Projects</Link>{project && <> / <Link href={`/projects/${project.id}`}>{project.name}</Link></>}{song && <> / <span>{song.title}</span></>}</nav>
-      {error && <div className="error" role="alert">{error} <button type="button" onClick={() => { setError(""); setLoading(true); setRetry((n) => n + 1); }}>Reload data</button></div>}
-      {notice && <p role="status" className="notice">{notice}</p>}
-      {loading ? <p role="status">Loading your music…</p> : (
-        <>
-          <h1>{songId ? song?.title ?? "Song unavailable" : projectId ? project?.name ?? "Project unavailable" : "Projects"}</h1>
-          {!songId && <p className="intro">{projectId ? project?.description : "Organize your music in progress. Create a project to get started."}</p>}
-          {song && <div className="metadata"><span>Artist: {song.artist || "—"}</span><span>BPM: {song.bpm ?? "—"}</span><span>Key: {song.key || "—"}</span><span>Status: {song.status}</span><p className="notes">{song.notes || "No song notes yet."}</p></div>}
-          {(!projectId && !songId || projectId && project || songId && song) && <div className="workspace">
-            <section aria-label={songId ? "Versions" : projectId ? "Songs" : "Projects"}>
-              <h2>{songId ? `Versions (${versions.length})` : projectId ? `Songs (${songs.length})` : `Your projects (${projects.length})`}</h2>
-              {songId ? versions.length ? versions.map((version) => <article className="card" key={version.id}>
-                <h3>{version.version_name}</h3><p className="muted">{version.original_filename} · {new Date(version.created_at).toLocaleString()}</p>
-                <p className="notes">{version.notes || "No version notes."}</p>
-                <audio controls preload="metadata" aria-label={`Play ${version.version_name}`} src={apiUrl(`/versions/${version.id}/audio`)} onError={() => setError(`Could not play ${version.version_name}. Check the audio file and browser codec support.`)} />
-              </article>) : <p className="empty">No versions yet. Upload the first recording.</p>
-              : projectId ? songs.length ? songs.map((item) => <Link className="card item" href={`/songs/${item.id}`} key={item.id}><h3>{item.title}</h3><p>{item.artist || "Unknown artist"} · {item.status}</p><span>Open song →</span></Link>) : <p className="empty">No songs yet. Add your first song.</p>
-              : projects.length ? projects.map((item) => <Link className="card item" href={`/projects/${item.id}`} key={item.id}><h3>{item.name}</h3><p className="notes">{item.description || "No description."}</p><span>Open project →</span></Link>) : <p className="empty">No projects yet. Create your first project.</p>}
-            </section>
-            <section className="card form-panel" aria-labelledby="form-title">
-              <h2 id="form-title">{songId ? "Upload a version" : projectId ? "Create a song" : "Create a project"}</h2>
-              <form onSubmit={submit}><fieldset disabled={saving}>
-                {songId ? <>
-                  <label>Version name<input name="version_name" required maxLength={200} placeholder="Demo v1" /></label>
-                  <label>Version notes<textarea name="notes" maxLength={10000} rows={4} /></label>
-                  <label>Audio file<input name="file" type="file" required accept=".wav,.mp3,.m4a,.flac,.aac,.ogg,.opus,.aif,.aiff" /></label>
-                  <p className="muted">Up to 250 MiB by default. Playback depends on browser codec support.</p>
-                </> : projectId ? <>
-                  <label>Title<input name="title" required maxLength={200} /></label>
-                  <label>Artist<input name="artist" maxLength={200} /></label>
-                  <div className="form-row"><label>BPM<input name="bpm" type="number" min="0.01" max="1000" step="any" /></label><label>Key<input name="key" maxLength={50} placeholder="C minor" /></label></div>
-                  <label>Status<select name="status" defaultValue="demo"><option value="idea">Idea</option><option value="demo">Demo</option><option value="in progress">In progress</option><option value="mixing">Mixing</option><option value="mastered">Mastered</option><option value="finished">Finished</option></select></label>
-                  <label>Song notes<textarea name="notes" maxLength={10000} rows={4} /></label>
-                </> : <>
-                  <label>Project name<input name="name" required maxLength={200} /></label>
-                  <label>Description<textarea name="description" maxLength={10000} rows={4} /></label>
-                </>}
-                <button type="submit">{saving ? songId ? "Uploading…" : "Saving…" : songId ? "Upload version" : projectId ? "Create song" : "Create project"}</button>
-              </fieldset></form>
-            </section>
-          </div>}
-        </>
-      )}
-      <footer>UNRELEASED <span>Your local music workspace.</span></footer>
-    </main>
-  );
+  return <main>
+    <header><Link href="/" className="brand">unreleased<span className="dot">.</span></Link><span className="badge">LOCAL WORKSPACE</span></header>
+    <nav aria-label="Breadcrumb"><Link href="/projects">Library</Link>{project && <> / <Link href={`/projects/${project.id}`}>{project.name}</Link></>}{song && <> / <span>{song.title}</span></>}</nav>
+    {error && <div className="error" role="alert">{error} <button onClick={() => { setError(""); setLoading(true); setRevision((value) => value + 1); }}>Retry</button></div>}
+    {notice && <p className="notice" role="status">{notice}</p>}
+    {loading ? <p role="status">Loading your music…</p> : songId ? song && <>
+      <div className="section-heading"><div><p className="eyebrow">TRACK / {song.position}</p><h1>{song.title}</h1><p className="muted">{song.artist || project?.artist || "Your library"}</p></div><SongActions song={song} onChange={onChange} onDelete={onDelete} /></div>
+      <div className="metadata"><span>BPM: {song.bpm ?? "—"}</span><span>Key: {song.key || "—"}</span><span>Status: {song.status}</span></div>
+      {song.notes && <p className="notes">{song.notes}</p>}
+      <div className="section-heading"><h2>Versions ({versions.length})</h2><p className="muted">Use the track menu to add a version.</p></div>
+      <div className="version-list">{versions.map((version) => <article className="version-row" key={version.id}>
+        <button className="row-play" aria-label={`Play ${version.version_name}`} onClick={() => {
+          if (player.current?.versionId === version.id) player.toggle();
+          else player.playQueue([{ songId: song.id, title: song.title, artist: song.artist, versionId: version.id }]);
+        }}>{player.current?.versionId === version.id && player.playing ? "Ⅱ" : "▶"}</button>
+        <div><h3>{version.version_name}</h3><p className="muted">{version.original_filename} · {new Date(version.created_at).toLocaleDateString()}</p>{version.notes && <p className="notes">{version.notes}</p>}</div>
+      </article>)}</div>
+      {!versions.length && <p className="empty">This track has no audio yet. Use its menu to upload a version.</p>}
+    </> : projectId ? project && <>
+      <section className="album-header">
+        <div className="album-cover" aria-hidden="true">{project.name.slice(0, 1).toUpperCase()}<span>UNRELEASED</span></div>
+        <div><p className="eyebrow">PROJECT</p><h1>{project.name}</h1><p className="album-subtitle">{project.artist || "Your library"} <span>· {songs.length} {songs.length === 1 ? "track" : "tracks"}</span></p>
+          {project.description && <p className="description">{project.description}</p>}
+          <div className="album-buttons"><button disabled={!queue.length} onClick={() => player.playQueue(queue)}>▶ Play All</button><button className="secondary" onClick={() => openDialog("tracks")}>＋ Add Tracks</button></div>
+        </div>
+      </section>
+      <ol className="track-list" aria-label="Project tracks">{songs.map((item) => <li className={`track-row ${player.current?.songId === item.id ? "is-current" : ""}`} key={item.id}>
+        <span className="track-number">{item.position}</span>
+        <button className="row-play" aria-label={`${player.current?.songId === item.id && player.playing ? "Pause" : "Play"} ${item.title}`} disabled={!item.latest_version_id} onClick={() => playSong(item)}>{player.current?.songId === item.id && player.playing ? "Ⅱ" : "▶"}</button>
+        <div className="track-title"><Link href={`/songs/${item.id}`}>{item.title}</Link><time dateTime={item.created_at}>Uploaded {new Date(item.created_at).toLocaleDateString()}</time></div>
+        <SongActions song={item} onChange={onChange} onDelete={onDelete} />
+      </li>)}</ol>
+      {!songs.length && <div className="empty"><h2>Start with the music.</h2><p>Add one or several recordings. Names come from your files; details can wait.</p><button className="secondary" onClick={() => openDialog("tracks")}>Add Tracks</button></div>}
+    </> : <>
+      <div className="section-heading"><div><p className="eyebrow">YOUR MUSIC, IN PROGRESS</p><h1>Library</h1></div><button onClick={() => openDialog("project")}>＋ New Project</button></div>
+      <div className="project-grid">{projects.map((item) => <Link className="project-tile" href={`/projects/${item.id}`} key={item.id}><div className="album-cover" aria-hidden="true">{item.name.slice(0, 1).toUpperCase()}<span>UNRELEASED</span></div><h2>{item.name}</h2><p className="muted">{item.artist || "Your library"}</p></Link>)}</div>
+      {!projects.length && <p className="empty">Create a project, then add your recordings.</p>}
+    </>}
+    {dialog && <Modal title={dialog === "tracks" ? "Add Tracks" : "New Project"} onClose={() => setDialog(null)} busy={busy}>
+      <form onSubmit={submit}>{dialogError && <p role="alert" className="error">{dialogError}</p>}<fieldset disabled={busy}>
+        {dialog === "tracks" ? <><p className="muted">Each file becomes a track with its original version. Add details whenever you’re ready.</p><label>Audio files<input name="files" type="file" multiple required accept=".wav,.mp3,.m4a,.flac,.aac,.ogg,.opus,.aif,.aiff" /></label><p className="muted">Up to 50 files per batch. If a file fails, the entire batch is rolled back.</p></> : <>
+          <label>Project name<input name="name" required maxLength={200} /></label><label>Artist / owner<input name="artist" maxLength={200} /></label><label>Description<textarea name="description" maxLength={10000} rows={3} /></label>
+        </>}
+        <div className="dialog-buttons"><button className="secondary" type="button" onClick={() => setDialog(null)}>Cancel</button><button type="submit">{busy ? "Saving…" : dialog === "tracks" ? "Upload tracks" : "Create project"}</button></div>
+      </fieldset></form>
+    </Modal>}
+    <footer>UNRELEASED <span>Your local music workspace.</span></footer>
+  </main>;
 }

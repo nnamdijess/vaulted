@@ -1,7 +1,7 @@
 import { API_BASE_URL } from "./config";
 
-export type Project = { id: number; name: string; description: string; created_at: string };
-export type Song = { id: number; project_id: number; title: string; artist: string; bpm: number | null; key: string; status: string; notes: string; created_at: string };
+export type Project = { id: number; name: string; description: string; artist: string; created_at: string };
+export type Song = { id: number; project_id: number; title: string; artist: string; bpm: number | null; key: string; status: string; notes: string; created_at: string; position: number; latest_version_id: number | null };
 export type Version = { id: number; song_id: number; version_name: string; file_path: string; original_filename: string; notes: string; created_at: string };
 
 export function apiUrl(path: string) {
@@ -22,7 +22,7 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
       ? detail.map((item: { loc: string[]; msg: string }) => `${item.loc.join(".")}: ${item.msg}`).join("; ")
       : `Request failed (${response.status})`);
   }
-  return response.json();
+  return response.status === 204 ? undefined as T : response.json();
 }
 
 export function postJson(data: unknown): RequestInit {

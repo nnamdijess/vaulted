@@ -4,8 +4,8 @@ A self-hosted workspace for unreleased music, inspired by Untitled.
 
 ## Current milestone
 
-Working MVP: create projects and songs, save metadata and notes, upload multiple
-audio versions, and play or seek through them in the browser. Next.js with
+Upload-first MVP: create a project, add multiple audio tracks, edit details later,
+and listen to the project in a persistent sequential player. Next.js with
 TypeScript calls a FastAPI API backed by SQLAlchemy, SQLite and local audio files.
 No Docker or authentication is included at this stage. Run locally on loopback only.
 
@@ -92,8 +92,11 @@ migrations. SQLAlchemy sessions are isolated from route handlers.
 relative media keys in the database, so moving uploads to the Ubuntu Mac mini
 does not require rewriting absolute Windows paths. Back up both database and media.
 
-Tables are created automatically on API startup. This creates missing tables; it
-does not migrate existing tables when their schema changes. `Project` has many
+Tables are created automatically on API startup. A small idempotent SQLite upgrade
+adds `Project.artist` and `Song.position` to existing databases. Existing IDs,
+metadata, notes, versions and audio paths are preserved. On first upgrade, track
+positions preserve the previous newest-first order. Later uploads append in the
+order received. Restart the backend to apply the upgrade. `Project` has many
 `Song` records, and each song has many `SongVersion` records. No audio bytes are
 stored in SQLite. Uploads use unique UUID filenames; their original names are
 preserved as metadata. `MAX_UPLOAD_BYTES` defaults to 262144000 (250 MiB).
@@ -101,14 +104,26 @@ preserved as metadata. `MAX_UPLOAD_BYTES` defaults to 262144000 (250 MiB).
 ## Try the full flow
 
 1. Start both servers using the commands above and open http://localhost:3000.
-2. Enter a project name and optional description, then click **Create project**.
-3. Open the project, enter a song title, artist, BPM, key, status and notes, then
-   click **Create song**. Only the title is required; status defaults to demo.
-4. Open the song. Enter a version name, optional notes, and choose a WAV, MP3,
-   M4A, FLAC, AAC, OGG, OPUS or AIFF file. Click **Upload version**.
-5. Use the audio controls to play and seek. Upload another version, including
-   one with the same original filename, to confirm both versions remain available.
-6. Refresh the page to confirm projects, metadata, notes and versions persist.
+2. Click **New Project**, enter a name and optional artist/owner and description.
+3. Open the album-style project and click **Add Tracks**. Choose one or multiple
+   WAV, MP3, M4A, FLAC, AAC, OGG, OPUS or AIFF files, then **Upload tracks**.
+   Each file creates one Song and its initial Original SongVersion. Titles come
+   from filenames without extensions. No metadata entry is required.
+4. Open a track's three-dot menu to **Rename**, **Edit details**, **Upload new
+   version**, **Download** the latest original file, or **Delete** the song and
+   all its versions/files after confirming in the dialog.
+5. Click **Play All** or a track's play button. The bottom player supports
+   play/pause, seek, elapsed/duration and previous/next. It advances on audio end,
+   uses the latest version of each track, and stops at the end of the queue.
+   Playback persists while navigating within the app, but not after a full reload.
+6. Open a song title to inspect metadata and play older versions. Uploading a
+   new version keeps the same song and position. Refresh to verify persistence.
+
+Batch uploads are all-or-nothing, with at most 50 files per request and the
+configured per-file size limit. Duplicate original filenames are safe. An invalid
+file rolls back the batch and removes already-saved batch files. Position numbers
+are stable; deleting a track may leave gaps. Older tracks with no audio remain
+visible and editable; Play All skips them until a version is added.
 
 ## REST endpoints
 
@@ -118,11 +133,16 @@ preserved as metadata. `MAX_UPLOAD_BYTES` defaults to 262144000 (250 MiB).
 | GET, POST | `/api/projects` | List / create projects |
 | GET | `/api/projects/{project_id}` | Project details |
 | GET, POST | `/api/projects/{project_id}/songs` | List / create songs |
-| GET | `/api/songs/{song_id}` | Song details |
+| POST | `/api/projects/{project_id}/tracks` | Batch upload tracks and initial versions |
+| GET, PATCH, DELETE | `/api/songs/{song_id}` | View / edit / delete song |
 | GET, POST | `/api/songs/{song_id}/versions` | List / upload versions |
 | GET | `/api/versions/{version_id}/audio` | Inline audio with byte-range seeking |
+| GET | `/api/versions/{version_id}/audio?download=true` | Download original file |
 
-Create projects and songs with JSON. Upload versions using multipart form fields
+The legacy JSON create-song endpoint remains available. Batch track uploads use
+repeated multipart `files` fields. PATCH accepts any subset of title, artist, BPM,
+key, status and notes; use null to clear BPM and empty strings for optional text.
+Create projects with JSON (including optional artist). Upload versions using multipart form fields
 `version_name`, `notes` (optional), and `file`. Swagger at `/docs` provides forms
 and the full schemas. Missing records return 404, unsupported extensions 415,
 invalid/empty input 422, and files exceeding the configured size limit 413.
@@ -139,21 +159,34 @@ npm.cmd run test:e2e
 The tests start their own backend on port 8011 and frontend on port 3011. They
 use `frontend/.e2e-data/` for a separate database and audio files, all ignored by
 Git. These ports must be free. Fixtures are generated in code; no audio is tracked.
-Tests cover API validation, duplicate filenames, byte ranges, CORS, and the actual
-browser create/upload/play/seek flow. Browser playback runs muted. Test records
+The test frontend uses `.next-e2e/` to coexist with a normal dev server. Production
+verification can use `$env:NEXT_DIST_DIR='.next-verify'; npm.cmd run build` while
+the dev server is running (remove that environment variable afterwards).
+Tests cover API validation, duplicate filenames, batch rollback, byte ranges,
+CORS, track edits/deletion, downloads, navigation and sequential browser playback.
+Browser playback runs muted. Test records
 remain in the isolated test database; your normal library is not touched.
+
+From `backend/`, run the legacy database preservation test:
+
+```powershell
+.venv/Scripts/python.exe -m unittest discover -s tests -v
+```
 
 ## Current limitations
 
-- Creation and viewing only; editing/deleting metadata, notes or records is not yet implemented.
+- No drag-and-drop reordering, project editing/deletion, or editing existing version notes yet.
+- Play queues are snapshots. Press Play All again to include new uploads or latest versions.
 - No authentication or public sharing. Intended for local development.
 - No transcoding or audio-content inspection: extensions are checked, and media
   types are inferred from them. Codec support depends on the browser; PCM WAV and
   MP3 are good choices for the first test.
 - Upload size is checked while copying from the multipart temporary file; this
   is not a server-wide request-body limit. No resumable uploads or progress bar.
-- No pagination, migrations, waveform display, or automatic media cleanup on
-  manual database changes. Back up the database and uploads together.
+- No pagination, full migration framework, waveform display, or automatic media
+  cleanup on manual database changes. Song deletion removes stored audio after
+  committing metadata deletion; a filesystem failure is logged and can leave an
+  orphaned file for manual cleanup. Back up the database and uploads together.
 
 ## Git policy
 
