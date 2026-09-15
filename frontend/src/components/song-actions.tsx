@@ -5,7 +5,7 @@ import { api, apiUrl, postJson, Song } from "@/lib/api";
 import { usePlayer } from "./audio-player";
 import { Modal } from "./modal";
 
-type Action = "Rename" | "Edit details" | "Upload new version" | "Delete";
+type Action = "Notes" | "Rename" | "Edit details" | "Upload new version" | "Delete";
 export function SongActions({ song, onChange, onDelete }: { song: Song; onChange: (song: Song) => void; onDelete: (id: number) => void }) {
   const [menu, setMenu] = useState(false);
   const [action, setAction] = useState<Action | null>(null);
@@ -27,7 +27,7 @@ export function SongActions({ song, onChange, onDelete }: { song: Song; onChange
         await api(`/songs/${song.id}/versions`, { method: "POST", body: data });
         onChange(await api<Song>(`/songs/${song.id}`));
       } else {
-        const body = action === "Rename" ? { title: value("title") } : {
+        const body = action === "Notes" ? { notes: value("notes") } : action === "Rename" ? { title: value("title") } : {
           title: value("title"), artist: value("artist"), bpm: value("bpm") ? Number(value("bpm")) : null,
           key: value("key"), status: value("status") || "demo", notes: value("notes"),
         };
@@ -44,7 +44,7 @@ export function SongActions({ song, onChange, onDelete }: { song: Song; onChange
     {menu && <>
       <button className="menu-dismiss" aria-label="Close track actions" onClick={() => setMenu(false)} />
       <div className="actions-menu">
-        {(["Rename", "Edit details", "Upload new version"] as Action[]).map((item) => <button key={item} onClick={() => { setAction(item); setMenu(false); setError(""); }}>{item}</button>)}
+        {(["Rename", "Edit details", "Upload new version", "Notes"] as Action[]).map((item) => <button key={item} onClick={() => { setAction(item); setMenu(false); setError(""); }}>{item}</button>)}
         {song.latest_version_id ? <a href={apiUrl(`/versions/${song.latest_version_id}/audio?download=true`)} onClick={() => setMenu(false)}>Download</a> : <button disabled>Download</button>}
         <button className="danger-text" onClick={() => { setAction("Delete"); setMenu(false); setError(""); }}>Delete</button>
       </div>
@@ -54,7 +54,7 @@ export function SongActions({ song, onChange, onDelete }: { song: Song; onChange
         {error && <p role="alert" className="error">{error}</p>}
         <fieldset disabled={busy}>
           {action === "Delete" ? <p>Delete “{song.title}” and all its versions? This removes its audio files and cannot be undone.</p>
-          : action === "Upload new version" ? <>
+          : action === "Notes" ? <><p className="muted">Private song notes. Never included in share links.</p><label>Song notes<textarea name="notes" rows={6} maxLength={10000} defaultValue={song.notes} /></label></> : action === "Upload new version" ? <>
             <p className="muted">Add another recording to “{song.title}”. The track stays in its current position.</p>
             <label>Version name<input name="version_name" required maxLength={200} defaultValue="New version" /></label>
             <label>Version notes<textarea name="notes" rows={3} maxLength={10000} /></label>

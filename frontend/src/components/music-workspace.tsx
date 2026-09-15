@@ -7,8 +7,12 @@ import { api, postJson, Project, Song, Version } from "@/lib/api";
 import { QueueTrack, trackFor, usePlayer } from "./audio-player";
 import { Modal } from "./modal";
 import { SongActions } from "./song-actions";
+import { ProjectActions, ProjectAction } from "./project-actions";
+import { ProjectCover } from "./project-cover";
+import { ThemeSwitch } from "./theme-provider";
 
 export function MusicWorkspace({ projectId, songId }: { projectId?: string; songId?: string }) {
+  const [projectAction, setProjectAction] = useState<ProjectAction | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [project, setProject] = useState<Project | null>(null);
   const [songs, setSongs] = useState<Song[]>([]);
@@ -81,7 +85,7 @@ export function MusicWorkspace({ projectId, songId }: { projectId?: string; song
   }
 
   return <main>
-    <header><Link href="/" className="brand">unreleased<span className="dot">.</span></Link><span className="badge">LOCAL WORKSPACE</span></header>
+    <header><Link href="/" className="brand">unreleased<span className="dot">.</span></Link><ThemeSwitch /></header>
     <nav aria-label="Breadcrumb"><Link href="/projects">Library</Link>{project && <> / <Link href={`/projects/${project.id}`}>{project.name}</Link></>}{song && <> / <span>{song.title}</span></>}</nav>
     {error && <div className="error" role="alert">{error} <button onClick={() => { setError(""); setLoading(true); setRevision((value) => value + 1); }}>Retry</button></div>}
     {notice && <p className="notice" role="status">{notice}</p>}
@@ -100,8 +104,8 @@ export function MusicWorkspace({ projectId, songId }: { projectId?: string; song
       {!versions.length && <p className="empty">This track has no audio yet. Use its menu to upload a version.</p>}
     </> : projectId ? project && <>
       <section className="album-header">
-        <div className="album-cover" aria-hidden="true">{project.name.slice(0, 1).toUpperCase()}<span>UNRELEASED</span></div>
-        <div><p className="eyebrow">PROJECT</p><h1>{project.name}</h1><p className="album-subtitle">{project.artist || "Your library"} <span>· {songs.length} {songs.length === 1 ? "track" : "tracks"}</span></p>
+        <ProjectCover project={project} onClick={() => setProjectAction("Change cover")} />
+        <div><div className="project-heading"><p className="eyebrow">PROJECT</p><ProjectActions project={project} songs={songs} action={projectAction} setAction={setProjectAction} onChange={setProject} onSort={() => setRevision((value) => value + 1)} /></div><h1>{project.name}</h1><p className="album-subtitle">{project.artist || "Your library"} <span>· {songs.length} {songs.length === 1 ? "track" : "tracks"}</span></p>
           {project.description && <p className="description">{project.description}</p>}
           <div className="album-buttons"><button disabled={!queue.length} onClick={() => player.playQueue(queue)}>▶ Play All</button><button className="secondary" onClick={() => openDialog("tracks")}>＋ Add Tracks</button></div>
         </div>
@@ -115,7 +119,7 @@ export function MusicWorkspace({ projectId, songId }: { projectId?: string; song
       {!songs.length && <div className="empty"><h2>Start with the music.</h2><p>Add one or several recordings. Names come from your files; details can wait.</p><button className="secondary" onClick={() => openDialog("tracks")}>Add Tracks</button></div>}
     </> : <>
       <div className="section-heading"><div><p className="eyebrow">YOUR MUSIC, IN PROGRESS</p><h1>Library</h1></div><button onClick={() => openDialog("project")}>＋ New Project</button></div>
-      <div className="project-grid">{projects.map((item) => <Link className="project-tile" href={`/projects/${item.id}`} key={item.id}><div className="album-cover" aria-hidden="true">{item.name.slice(0, 1).toUpperCase()}<span>UNRELEASED</span></div><h2>{item.name}</h2><p className="muted">{item.artist || "Your library"}</p></Link>)}</div>
+      <div className="project-grid">{projects.map((item) => <Link className="project-tile" href={`/projects/${item.id}`} key={item.id}><ProjectCover project={item} /><h2>{item.name}</h2><p className="muted">{item.artist || "Your library"}</p></Link>)}</div>
       {!projects.length && <p className="empty">Create a project, then add your recordings.</p>}
     </>}
     {dialog && <Modal title={dialog === "tracks" ? "Add Tracks" : "New Project"} onClose={() => setDialog(null)} busy={busy}>

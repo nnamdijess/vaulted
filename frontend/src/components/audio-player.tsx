@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { createContext, useContext, useRef, useState } from "react";
 import { apiUrl, Song } from "@/lib/api";
+import { usePlaybackInsights } from "@/lib/playback-insights";
 
-export type QueueTrack = { songId: number; title: string; artist: string; versionId: number };
+export type QueueTrack = { songId: number; title: string; artist: string; versionId: number; publicToken?: string };
 export function trackFor(song: Song): QueueTrack | null {
   return song.latest_version_id ? { songId: song.id, title: song.title, artist: song.artist, versionId: song.latest_version_id } : null;
 }
@@ -16,6 +17,7 @@ type Player = {
   toggle: () => void;
   updateSong: (song: Song) => void;
   removeSong: (songId: number) => void;
+  removeSongs: (songIds: number[]) => void;
 };
 const Context = createContext<Player | null>(null);
 export function usePlayer() {
@@ -38,6 +40,10 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
   const [duration, setDuration] = useState(0);
   const [error, setError] = useState("");
   const current = queue[index] ?? null;
+  const canPlay = Boolean(current);
+  const canPrevious = Boolean(current && index > 0);
+  const canNext = Boolean(current && index < queue.length - 1);
+  const insights = usePlaybackInsights();
 
   function resume() {
     const element = audio.current;
@@ -47,13 +53,17 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
       if (err.name !== "AbortError") setError("Playback could not start. Press play to retry or choose another track.");
     });
   }
-  function playQueue(tracks: QueueTrack[], start = 0) {
+  function playQueue(tracks: QueueTrack[], start = 0, autoPlay = true) {
     if (!tracks[start] || !audio.current) return;
     queueRef.current = tracks;
     indexRef.current = start;
     setQueue(tracks); setIndex(start); setElapsed(0); setDuration(0); setError("");
-    audio.current.src = apiUrl(`/versions/${tracks[start].versionId}/audio`);
-    resume();
+    const track = tracks[start];
+    const publicBase = track.publicToken ? `/api/public/${encodeURIComponent(track.publicToken)}/songs/${track.songId}` : null;
+    insights.begin(publicBase ? `${publicBase}/listens` : apiUrl(`/songs/${track.songId}/listens`));
+    audio.current.src = publicBase ? `${publicBase}/audio` : apiUrl(`/versions/${track.versionId}/audio`);
+    if (autoPlay) resume();
+    else audio.current.load();
   }
   function toggle() {
     if (!audio.current || !queueRef.current.length) return;
@@ -69,13 +79,18 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
     setQueue(queueRef.current);
   }
   function removeSong(songId: number) {
+    removeSongs([songId]);
+  }
+  function removeSongs(songIds: number[]) {
+    const removed = new Set(songIds);
     const oldCurrent = queueRef.current[indexRef.current];
-    const remaining = queueRef.current.filter((track) => track.songId !== songId);
-    if (oldCurrent?.songId === songId) {
+    const remaining = queueRef.current.filter((track) => !removed.has(track.songId));
+    if (oldCurrent && removed.has(oldCurrent.songId)) {
+      const wasPlaying = Boolean(audio.current && !audio.current.paused);
       audio.current?.pause();
-      if (remaining.length) playQueue(remaining, Math.min(indexRef.current, remaining.length - 1));
+      if (remaining.length) playQueue(remaining, Math.min(indexRef.current, remaining.length - 1), wasPlaying);
       else {
-        queueRef.current = []; setQueue([]); setElapsed(0); setDuration(0);
+        queueRef.current = []; indexRef.current = 0; setIndex(0); setQueue([]); setElapsed(0); setDuration(0); setError(''); setPlaying(false);
         audio.current?.removeAttribute("src"); audio.current?.load();
       }
     } else {
@@ -85,23 +100,25 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
     }
   }
 
-  return <Context.Provider value={{ current, playing, playQueue, toggle, updateSong, removeSong }}>
+  return <Context.Provider value={{ current, playing, playQueue, toggle, updateSong, removeSong, removeSongs }}>
     {children}
     <aside className="audio-dock" aria-label="Audio player">
       <audio ref={audio} data-testid="global-audio" preload="metadata"
-        onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)}
-        onTimeUpdate={() => setElapsed(audio.current?.currentTime ?? 0)}
+        onPlay={() => { setPlaying(true); if (audio.current) insights.resetSample(audio.current); }} onPause={() => setPlaying(false)}
+        onSeeking={() => { if (audio.current) insights.resetSample(audio.current); }}
+        onSeeked={() => { if (audio.current) insights.resetSample(audio.current); }}
+        onTimeUpdate={() => { setElapsed(audio.current?.currentTime ?? 0); if (audio.current) insights.tick(audio.current); }}
         onDurationChange={() => setDuration(Number.isFinite(audio.current?.duration) ? audio.current!.duration : 0)}
         onEnded={() => { setPlaying(false); move(1); }}
         onError={() => { setPlaying(false); setError("Unable to play this file. Check the backend and browser codec support."); }} />
       <div className="now-playing"><span className="mini-cover" aria-hidden="true">♫</span><div>
-        {current ? <Link href={`/songs/${current.songId}`}>{current.title}</Link> : <strong>Nothing playing</strong>}
+        {current ? <Link href={current.publicToken ? `/share/${current.publicToken}` : `/songs/${current.songId}`}>{current.title}</Link> : <strong>Nothing playing</strong>}
         <small>{current?.artist || (current ? "Unreleased" : "Choose a track to listen")}</small>
       </div></div>
       <div className="transport">
-        <button className="icon-button" aria-label="Previous track" disabled={!current || index === 0} onClick={() => move(-1)}>⏮</button>
-        <button className="play-button" aria-label={playing ? "Pause playback" : "Resume playback"} disabled={!current} onClick={toggle}>{playing ? "Ⅱ" : "▶"}</button>
-        <button className="icon-button" aria-label="Next track" disabled={!current || index >= queue.length - 1} onClick={() => move(1)}>⏭</button>
+        <button className="icon-button" aria-label="Previous track" disabled={!canPrevious} onClick={() => move(-1)}>⏮</button>
+        <button className="play-button" aria-label={playing ? "Pause playback" : "Resume playback"} disabled={!canPlay} onClick={toggle}>{playing ? "Ⅱ" : "▶"}</button>
+        <button className="icon-button" aria-label="Next track" disabled={!canNext} onClick={() => move(1)}>⏭</button>
       </div>
       <div className="timeline"><span aria-label="Elapsed time">{clock(elapsed)}</span>
         <input aria-label="Seek audio" type="range" min={0} max={duration || 0} step="0.1" value={Math.min(elapsed, duration)} disabled={!duration} onChange={(event) => {

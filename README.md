@@ -4,6 +4,10 @@ A self-hosted workspace for unreleased music, inspired by Untitled.
 
 ## Current milestone
 
+Artwork, share links, private notes, listening insights and persistent light/dark/system
+themes are now available. See [the feature guide](docs/project-features.md) for API
+details, public-hosting boundaries, counting rules, hydration findings and tests.
+
 Upload-first MVP: create a project, add multiple audio tracks, edit details later,
 and listen to the project in a persistent sequential player. Next.js with
 TypeScript calls a FastAPI API backed by SQLAlchemy, SQLite and local audio files.
@@ -175,9 +179,11 @@ From `backend/`, run the legacy database preservation test:
 
 ## Current limitations
 
-- No drag-and-drop reordering, project editing/deletion, or editing existing version notes yet.
+- No drag-and-drop reordering or editing existing version notes yet. Project menus support
+  sorting, settings, notes, artwork, insights, sharing and deletion.
 - Play queues are snapshots. Press Play All again to include new uploads or latest versions.
-- No authentication or public sharing. Intended for local development.
+- The owner interface has no login and must remain private. Share pages are read-only
+  token links; expose only the frontend and its public API proxy, not the owner backend.
 - No transcoding or audio-content inspection: extensions are checked, and media
   types are inferred from them. Codec support depends on the browser; PCM WAV and
   MP3 are good choices for the first test.

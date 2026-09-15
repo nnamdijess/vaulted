@@ -2,19 +2,7 @@ import { expect, test } from "@playwright/test";
 
 const backend = "http://127.0.0.1:8011/api";
 
-function wav() {
-  const rate = 8000;
-  const samples = rate * 3;
-  const buffer = Buffer.alloc(44 + samples * 2);
-  buffer.write("RIFF", 0); buffer.writeUInt32LE(buffer.length - 8, 4);
-  buffer.write("WAVEfmt ", 8); buffer.writeUInt32LE(16, 16);
-  buffer.writeUInt16LE(1, 20); buffer.writeUInt16LE(1, 22);
-  buffer.writeUInt32LE(rate, 24); buffer.writeUInt32LE(rate * 2, 28);
-  buffer.writeUInt16LE(2, 32); buffer.writeUInt16LE(16, 34);
-  buffer.write("data", 36); buffer.writeUInt32LE(samples * 2, 40);
-  for (let i = 0; i < samples; i++) buffer.writeInt16LE(Math.round(Math.sin(i * 440 * 2 * Math.PI / rate) * 1000), 44 + i * 2);
-  return buffer;
-}
+import { wav } from "./fixtures";
 
 test("REST flow, validation, unique storage and byte-range playback", async ({ request }) => {
   expect((await request.get(`${backend}/health`)).status()).toBe(200);
@@ -145,6 +133,10 @@ test("upload-first project, track actions and persistent sequential playback", a
   await page.getByRole("button", { name: "Play All" }).click();
   const player = page.getByRole("complementary", { name: "Audio player" });
   await expect(player.getByRole("link")).toHaveText("Renamed demo");
+  await page.getByLabel("Theme", { exact: true }).selectOption("light");
+  await expect(player.getByRole("button", { name: "Previous track" })).toBeDisabled();
+  await expect(player.getByRole("button", { name: "Next track" })).toBeEnabled();
+  await page.getByLabel("Theme", { exact: true }).selectOption("dark");
   await expect.poll(() => audio.evaluate((element: HTMLAudioElement) => element.currentTime)).toBeGreaterThan(0);
   await player.getByRole("button", { name: "Pause playback" }).click();
   await page.getByRole("slider", { name: "Seek audio" }).fill("2.8");

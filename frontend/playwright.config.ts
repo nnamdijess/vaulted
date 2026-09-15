@@ -26,7 +26,7 @@ export default defineConfig({
     {
       command: "npm run dev -- --port 3011",
       url: "http://127.0.0.1:3011",
-      env: { NEXT_PUBLIC_API_URL: "http://127.0.0.1:8011", NEXT_DIST_DIR: ".next-e2e" },
+      env: { NEXT_PUBLIC_API_URL: "http://127.0.0.1:8011", API_INTERNAL_URL: "http://127.0.0.1:8011", NEXT_DIST_DIR: ".next-e2e" },
       reuseExistingServer: false,
       timeout: 120000,
     },
