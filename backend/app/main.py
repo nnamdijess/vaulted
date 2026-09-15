@@ -7,10 +7,12 @@ from app.api.health import router as health_router
 from app.core.config import settings
 from app.api.music import router as music_router
 from app.db.session import Base, engine
+from app.db.migrations import upgrade_local_database
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
+    upgrade_local_database(engine)
     yield
 
 

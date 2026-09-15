@@ -16,6 +16,7 @@ class Project(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(200))
     description: Mapped[str] = mapped_column(Text, default="")
+    artist: Mapped[str] = mapped_column(String(200), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     songs: Mapped[list["Song"]] = relationship(back_populates="project", cascade="all, delete-orphan")
 
@@ -25,6 +26,7 @@ class Song(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), index=True)
+    position: Mapped[int] = mapped_column(default=1)
     title: Mapped[str] = mapped_column(String(200))
     artist: Mapped[str] = mapped_column(String(200), default="")
     bpm: Mapped[float | None]
@@ -34,6 +36,10 @@ class Song(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     project: Mapped[Project] = relationship(back_populates="songs")
     versions: Mapped[list["SongVersion"]] = relationship(back_populates="song", cascade="all, delete-orphan")
+
+    @property
+    def latest_version_id(self) -> int | None:
+        return max((version.id for version in self.versions), default=None)
 
 
 class SongVersion(Base):
