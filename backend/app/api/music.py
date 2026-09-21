@@ -181,3 +181,9 @@ def audio_response(version, download=False):
         filename=version.original_filename, content_disposition_type="attachment" if download else "inline",
         headers={"X-Content-Type-Options": "nosniff"},
     )
+
+
+@router.get('/versions/{version_id}/waveform', tags=['versions'])
+def get_waveform(version_id: int, db: Database):
+    from app.services.waveform import waveform
+    return waveform(require_record(db, SongVersion, version_id))

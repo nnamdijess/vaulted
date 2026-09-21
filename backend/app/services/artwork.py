@@ -13,7 +13,7 @@ COVER_TYPES = {'.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
 FORMATS = {'JPEG': '.jpg', 'PNG': '.png', 'WEBP': '.webp'}
 
 
-def save_cover(upload: UploadFile) -> str:
+def save_cover(upload: UploadFile, directory: str = 'covers') -> str:
     extension = Path(upload.filename or '').suffix.lower()
     if extension not in COVER_TYPES:
         raise HTTPException(415, 'Choose a JPEG, PNG or WebP image')
@@ -32,8 +32,8 @@ def save_cover(upload: UploadFile) -> str:
                 image.verify()
     except (UnidentifiedImageError, OSError, SyntaxError, Image.DecompressionBombError, Image.DecompressionBombWarning):
         raise HTTPException(422, 'Invalid or unsafe image file') from None
-    key = f'covers/{uuid4().hex}{actual}'
-    (storage_root() / 'covers').mkdir(parents=True, exist_ok=True)
+    key = f'{directory}/{uuid4().hex}{actual}'
+    (storage_root() / directory).mkdir(parents=True, exist_ok=True)
     try:
         with audio_path(key).open('xb') as output:
             output.write(content)
@@ -43,3 +43,11 @@ def save_cover(upload: UploadFile) -> str:
         audio_path(key).unlink(missing_ok=True)
         raise
     return key
+
+
+def image_response(key):
+    from fastapi.responses import FileResponse
+    if not key or not audio_path(key).is_file():
+        raise HTTPException(404, 'Image not found')
+    path = audio_path(key)
+    return FileResponse(path, media_type=COVER_TYPES[path.suffix], headers={'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff'})

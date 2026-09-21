@@ -13,7 +13,7 @@ from app.api.music import Database, lock_track_order, require_record, audio_resp
 from app.models.music import ListenEvent, Project, Song, SongVersion
 from app.schemas.music import ProjectRead
 from app.schemas.project_features import ListenCreate, NotesUpdate, ProjectUpdate, ShareUpdate, TrackOrder
-from app.services.artwork import COVER_TYPES, save_cover
+from app.services.artwork import save_cover
 from app.services.storage import audio_path
 
 router = APIRouter(tags=['project features'])
@@ -101,10 +101,8 @@ def remove_cover(project_id: int, db: Database):
 
 
 def cover_response(project):
-    if not project.cover_path or not audio_path(project.cover_path).is_file():
-        raise HTTPException(404, 'Cover not found')
-    path = audio_path(project.cover_path)
-    return FileResponse(path, media_type=COVER_TYPES[path.suffix], headers={'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff'})
+    from app.services.artwork import image_response
+    return image_response(project.cover_path)
 
 
 @router.get('/projects/{project_id}/cover')
@@ -218,3 +216,12 @@ def insights(project_id: int, db: Database):
             'songs': [{'id': row[0], 'title': row[1], 'streams': row[2]} for row in rows],
             'most_played': top[1] if top and top[2] else None,
             'recent': [{'title': title, 'source': event.source, 'timestamp': event.created_at.replace(tzinfo=timezone.utc).isoformat()} for event, title in recent]}
+
+
+@public_router.get('/{token}/songs/{song_id}/waveform')
+def public_waveform(token: str, song_id: int, db: PublicDatabase):
+    from app.services.waveform import waveform
+    _, song = shared_song(db, token, song_id)
+    if song.latest_version_id is None:
+        raise HTTPException(404, 'Audio not found')
+    return waveform(db.get(SongVersion, song.latest_version_id))

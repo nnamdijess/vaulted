@@ -8,6 +8,10 @@ def upgrade_local_database(engine: Engine) -> None:
     with engine.begin() as connection:
         # Serialize startup upgrades when multiple local workers start together.
         connection.exec_driver_sql("BEGIN IMMEDIATE")
+        if inspect(connection).has_table('users'):
+            user_columns = {c['name'] for c in inspect(connection).get_columns('users')}
+            if 'avatar_path' not in user_columns:
+                connection.exec_driver_sql('ALTER TABLE users ADD COLUMN avatar_path VARCHAR(255)')
         project_columns = {column["name"] for column in inspect(connection).get_columns("projects")}
         if "artist" not in project_columns:
             connection.exec_driver_sql("ALTER TABLE projects ADD COLUMN artist VARCHAR(200) NOT NULL DEFAULT ''")

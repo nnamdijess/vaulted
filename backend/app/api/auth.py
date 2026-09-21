@@ -5,7 +5,7 @@ from typing import Annotated
 
 from argon2 import PasswordHasher
 from argon2.exceptions import VerificationError, InvalidHashError
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, UploadFile, File
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
@@ -49,7 +49,7 @@ def token_hash(token):
 
 
 def account(user):
-    return {'id': user.id, 'email': user.email, 'display_name': user.display_name}
+    return {'id': user.id, 'email': user.email, 'display_name': user.display_name, 'avatar_path': user.avatar_path}
 
 
 def current_user(request: Request):
@@ -126,4 +126,39 @@ def logout(request: Request, response: Response):
 
 @router.get('/me')
 def me(user: Annotated[User, Depends(current_user)]):
+    return account(user)
+
+
+@router.get('/avatar')
+def avatar(user: Annotated[User, Depends(current_user)]):
+    from app.services.artwork import image_response
+    return image_response(user.avatar_path)
+
+
+@router.post('/avatar')
+def upload_avatar(file: Annotated[UploadFile, File()], db=Depends(owned_session)):
+    from app.services.artwork import save_cover
+    from app.api.project_features import remove_files
+    user = db.get(User, db.info['owner_id'])
+    key = save_cover(file, 'avatars')
+    old = user.avatar_path
+    try:
+        user.avatar_path = key
+        db.commit()
+    except Exception:
+        db.rollback()
+        remove_files([key])
+        raise
+    remove_files([old])
+    return account(user)
+
+
+@router.delete('/avatar')
+def remove_avatar(db=Depends(owned_session)):
+    from app.api.project_features import remove_files
+    user = db.get(User, db.info['owner_id'])
+    old = user.avatar_path
+    user.avatar_path = None
+    db.commit()
+    remove_files([old])
     return account(user)
