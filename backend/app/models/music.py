@@ -56,6 +56,12 @@ class Song(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     project: Mapped[Project] = relationship(back_populates="songs")
     versions: Mapped[list["SongVersion"]] = relationship(back_populates="song", cascade="all, delete-orphan")
+    favorites: Mapped[list["Favorite"]] = relationship(cascade="all, delete-orphan")
+
+    @property
+    def latest_version_name(self) -> str | None:
+        version = max(self.versions, key=lambda v: v.id, default=None)
+        return version.version_name if version else None
 
     @property
     def latest_version_id(self) -> int | None:
@@ -73,6 +79,13 @@ class SongVersion(Base):
     notes: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     song: Mapped[Song] = relationship(back_populates="versions")
+
+
+class Favorite(Base):
+    __tablename__ = "favorites"
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), primary_key=True)
+    song_id: Mapped[int] = mapped_column(ForeignKey("songs.id"), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
 class ListenEvent(Base):

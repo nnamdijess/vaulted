@@ -170,6 +170,19 @@ class Preferences(BaseModel):
     accent_color: Literal['green', 'blue', 'purple', 'pink', 'orange', 'teal']
 
 
+class ProfileUpdate(BaseModel):
+    model_config = ConfigDict(extra='forbid', str_strip_whitespace=True)
+    display_name: str = Field(min_length=1, max_length=200)
+
+
+@router.patch('/profile')
+def update_profile(data: ProfileUpdate, db=Depends(owned_session)):
+    user = db.get(User, db.info['owner_id'])
+    user.display_name = data.display_name
+    db.commit()
+    return account(user)
+
+
 @router.patch('/preferences')
 def preferences(data: Preferences, db=Depends(owned_session)):
     user = db.get(User, db.info['owner_id'])

@@ -74,6 +74,7 @@ class SongRead(Record):
     notes: str
     position: int
     latest_version_id: int | None
+    latest_version_name: str | None
 
 
 class VersionRead(Record):

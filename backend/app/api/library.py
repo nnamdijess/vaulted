@@ -1,14 +1,36 @@
 """Private artwork history and lightweight owner-scoped song search."""
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import select
+from sqlalchemy import select, delete
+from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.orm import selectinload
 from app.api.music import Database, require_record
-from app.models.music import Artwork, Project, Song
+from app.models.music import Artwork, Project, Song, Favorite
 from app.schemas.music import ProjectRead
 from app.services.artwork import image_response
 
 router = APIRouter(tags=["library"])
+
+class FavoriteUpdate(BaseModel):
+    model_config = ConfigDict(extra='forbid', strict=True)
+    favorite: bool
+
+@router.get('/songs/{song_id}/favorite')
+def get_favorite(song_id: int, db: Database):
+    require_record(db, Song, song_id)
+    return {'favorite': db.get(Favorite, (db.info['owner_id'], song_id)) is not None}
+
+@router.put('/songs/{song_id}/favorite')
+def set_favorite(song_id: int, data: FavoriteUpdate, db: Database):
+    require_record(db, Song, song_id)
+    owner_id = db.info['owner_id']
+    if data.favorite:
+        # Idempotent even when two tabs favorite the same song concurrently.
+        db.execute(insert(Favorite).values(owner_id=owner_id, song_id=song_id).on_conflict_do_nothing())
+    else:
+        db.execute(delete(Favorite).where(Favorite.owner_id == owner_id, Favorite.song_id == song_id))
+    db.commit()
+    return {'favorite': data.favorite}
 
 @router.get('/artworks')
 def artworks(db: Database):
@@ -60,6 +82,7 @@ def search_songs(db: Database, q: str = Query(default='', max_length=200), offse
     return {'items': [{'id': s.id, 'project_id': s.project_id, 'title': s.title,
              'artist': s.artist or s.project.artist or s.project.owner_name,
              'song_artist': s.artist, 'fallback_artist': s.project.artist or s.project.owner_name,
+             'uses_owner_name': not bool(s.project.artist), 'version_name': s.latest_version_name,
              'latest_version_id': s.latest_version_id,
              'project_name': s.project.name, 'cover_path': s.project.cover_path} for s in songs],
             'has_more': len(ids) > 50}

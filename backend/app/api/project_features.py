@@ -153,6 +153,7 @@ def public_project(token: str, db: PublicDatabase):
     return {'name': project.name, 'artist': project.artist, 'owner_name': project.owner_name, 'has_cover': bool(project.cover_path),
             'allow_downloads': project.allow_downloads,
             'tracks': [{'id': s.id, 'title': s.title, 'artist': s.artist, 'position': s.position,
+                        'version_id': s.latest_version_id, 'version_name': s.latest_version_name,
                         'playable': s.latest_version_id is not None} for s in songs]}
 
 
@@ -162,12 +163,16 @@ def public_cover(token: str, db: PublicDatabase):
 
 
 @public_router.get('/{token}/songs/{song_id}/audio')
-def public_audio(token: str, song_id: int, db: PublicDatabase, download: bool = False):
+def public_audio(token: str, song_id: int, db: PublicDatabase, download: bool = False, version_id: int | None = None):
     project, song = shared_song(db, token, song_id)
     if download and not project.allow_downloads:
         raise HTTPException(403, 'Downloads are disabled for this project')
     if song.latest_version_id is None:
         raise HTTPException(404, 'Audio not found')
+    # A loaded queue must not silently switch recordings after an owner uploads.
+    # Historical private versions are not made public by this selector.
+    if version_id is not None and version_id != song.latest_version_id:
+        raise HTTPException(404, 'This version is no longer shared. Reload the project.')
     response = audio_response(db.get(SongVersion, song.latest_version_id), download)
     response.headers['Cache-Control'] = 'no-store'
     return response
@@ -216,9 +221,11 @@ def insights(project_id: int, db: Database):
 
 
 @public_router.get('/{token}/songs/{song_id}/waveform')
-def public_waveform(token: str, song_id: int, db: PublicDatabase):
+def public_waveform(token: str, song_id: int, db: PublicDatabase, version_id: int | None = None):
     from app.services.waveform import waveform
     _, song = shared_song(db, token, song_id)
     if song.latest_version_id is None:
         raise HTTPException(404, 'Audio not found')
+    if version_id is not None and version_id != song.latest_version_id:
+        raise HTTPException(404, 'This version is no longer shared. Reload the project.')
     return waveform(db.get(SongVersion, song.latest_version_id))
