@@ -12,6 +12,12 @@ export function projectCoverUrl(project?: Project | null): string | undefined {
 }
 
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
+  if (init?.body instanceof FormData) {
+    const bytes = Array.from(init.body.values()).reduce((sum, value) => sum + (value instanceof Blob ? value.size : 0), 0);
+    if (bytes > 500 * 1024 * 1024) {
+      throw new Error("These files exceed the 500 MiB upload batch limit. Choose fewer files and upload them in separate batches.");
+    }
+  }
   let response: Response;
   try {
     response = await fetch(apiUrl(path), { cache: "no-store", credentials: "same-origin", ...init });

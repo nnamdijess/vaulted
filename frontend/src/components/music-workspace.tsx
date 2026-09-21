@@ -129,7 +129,7 @@ function WorkspaceContent({ projectId, songId }: { projectId?: string; songId?: 
     </>}
     {dialog && <Modal title={dialog === "tracks" ? "Add Tracks" : "New Project"} onClose={() => setDialog(null)} busy={busy}>
       <form onSubmit={submit}>{dialogError && <p role="alert" className="error">{dialogError}</p>}<fieldset disabled={busy}>
-        {dialog === "tracks" ? <><p className="muted">Each file becomes a track with its original version. Add details whenever you’re ready.</p><label>Audio files<input name="files" type="file" multiple required accept=".wav,.mp3,.m4a,.flac,.aac,.ogg,.opus,.aif,.aiff" /></label><p className="muted">Up to 50 files per batch. If a file fails, the entire batch is rolled back.</p></> : <>
+        {dialog === "tracks" ? <><p className="muted">Each file becomes a track with its original version. Add details whenever you’re ready.</p><label>Audio files<input name="files" type="file" multiple required accept=".wav,.mp3,.m4a,.flac,.aac,.ogg,.opus,.aif,.aiff" /></label><p className="muted">Up to 50 files and 500 MiB total per batch. If a file fails, the entire batch is rolled back.</p></> : <>
           <label>Project name<input name="name" required maxLength={200} /></label><label>Artist / owner<input name="artist" maxLength={200} /></label><label>Description<textarea name="description" maxLength={10000} rows={3} /></label>
         </>}
         <div className="dialog-buttons"><button className="secondary" type="button" onClick={() => setDialog(null)}>Cancel</button><button type="submit">{busy ? "Saving…" : dialog === "tracks" ? "Upload tracks" : "Create project"}</button></div>

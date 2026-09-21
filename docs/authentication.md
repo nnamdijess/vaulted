@@ -149,3 +149,13 @@ The rate limiter is per process and resets on restart. SQLite/media backups cont
 private data and require filesystem protection. Revocation cannot recall already
 buffered/downloaded audio. Analytics remain lightweight client-reported listening,
 not fraud-resistant billing data.
+
+## Upload proxy limits
+
+Next.js buffers rewritten requests. Its default 10 MiB buffer truncates larger
+multipart uploads, which can stall and return HTTP 500. The configured buffer is
+512 MiB with a 120-second proxy timeout. The upload UI checks a 500 MiB total-file
+limit before sending, leaving space for multipart overhead. Split larger selections
+into batches. FastAPI still enforces its separate per-file limit (250 MiB by default).
+Restart Next.js after changing proxy configuration. This is a bounded buffered proxy,
+not a streaming upload gateway; future hosting must account for concurrent memory use.
