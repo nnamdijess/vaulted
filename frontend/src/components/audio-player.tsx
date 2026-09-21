@@ -6,9 +6,9 @@ import { createContext, useContext, useRef, useState } from "react";
 import { apiUrl, Project, projectCoverUrl, Song } from "@/lib/api";
 import { usePlaybackInsights } from "@/lib/playback-insights";
 
-export type QueueTrack = { songId: number; title: string; artist: string; versionId: number; publicToken?: string; projectId?: number; coverUrl?: string };
+export type QueueTrack = { songId: number; title: string; artist: string; fallbackArtist?: string; versionId: number; publicToken?: string; projectId?: number; coverUrl?: string };
 export function trackFor(song: Song, project?: Project | null): QueueTrack | null {
-  return song.latest_version_id ? { songId: song.id, title: song.title, artist: song.artist, versionId: song.latest_version_id, projectId: song.project_id, coverUrl: projectCoverUrl(project) } : null;
+  return song.latest_version_id ? { songId: song.id, title: song.title, artist: song.artist, fallbackArtist: project?.artist || project?.owner_name || "", versionId: song.latest_version_id, projectId: song.project_id, coverUrl: projectCoverUrl(project) } : null;
 }
 
 type Player = {
@@ -93,7 +93,7 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
   }
   function updateProject(project: Project) {
     queueRef.current = queueRef.current.map((track) => track.projectId === project.id && !track.publicToken
-      ? { ...track, coverUrl: projectCoverUrl(project) } : track);
+      ? { ...track, coverUrl: projectCoverUrl(project), fallbackArtist: project.artist || project.owner_name } : track);
     setQueue(queueRef.current);
   }
   function reorderProject(projectId: number, songIds: number[]) {
@@ -139,7 +139,7 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
         onError={() => { setPlaying(false); setError("Unable to play this file. Check the backend and browser codec support."); }} />
       <div className="now-playing"><PlayerArtwork key={current?.coverUrl ?? 'placeholder'} src={current?.coverUrl} title={current?.title ?? 'current track'} /><div>
         {current ? <Link href={current.publicToken ? `/share/${current.publicToken}` : `/songs/${current.songId}`}>{current.title}</Link> : <strong>Nothing playing</strong>}
-        <small>{current?.artist || (current ? "Vaulted" : "Choose a track to listen")}</small>
+        <small>{current ? current.artist || current.fallbackArtist || "Unknown artist" : "Choose a track to listen"}</small>
       </div></div>
       {/* Firefox must not restore stale disabled states before React hydrates. */}
       <div className="transport">

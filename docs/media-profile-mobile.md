@@ -3,7 +3,8 @@
 ## Use the new controls
 
 Click a project's cover or choose **Change cover** from its actions menu. Select a
-JPEG, PNG or WebP, drag the square preview with a mouse or finger, and adjust Zoom.
+JPEG, PNG or WebP, view the entire image, then move the outlined square with a mouse or finger.
+Drag its bottom-right handle to resize, or adjust Selection zoom.
 Horizontal/Vertical position sliders also support precise keyboard adjustments.
 **Save** uploads a 1024×1024 PNG of the selected area; **Cancel** leaves the stored
 cover unchanged. Replacement updates owner cards/pages/player and subsequent public
@@ -12,9 +13,9 @@ uncropped images are not retained; choose the original file again to change the 
 Existing limits (10 MiB input and 25 megapixels) remain; the backend independently
 validates the saved image. There is no new image-library dependency.
 
-Click your account name in the header to open `/profile`. It shows your existing
+Tap your profile picture (or the fallback avatar) in the top-right header to open `/profile`. It shows your existing
 name/email, profile picture upload/replace/remove, and Light/Dark/System selection.
-Logout remains available. No other account settings were added. Theme selection
+Logout and appearance controls now live only in the private profile. Theme selection
 continues to persist on that browser and respect the system on first visit.
 
 `users.avatar_path` is a nullable relative key added at startup without resetting
@@ -165,3 +166,29 @@ $env:TEST_BROWSER='firefox'
 npm.cmd run test:e2e -- firefox-hydration
 Remove-Item Env:TEST_BROWSER
 ```
+
+
+## Saved project artwork and song search
+
+**Change cover → Saved artwork** shows your retained project covers. Choose a thumbnail
+to reuse it; the current one is marked Selected. Uploading a replacement, removing a
+cover, or deleting a project retains the collection. Profile photos are separate.
+Existing owned project covers are indexed on startup; previously deleted files cannot
+be recovered. The collection retains saved crops, not uncropped originals.
+
+The additive `artworks` table stores id, owner_id, relative file_path and created_at.
+Files remain under `uploads/covers/` with unique names. Projects continue to reference
+cover_path; shared files are never deleted by project operations.
+Private endpoints: `GET /api/artworks`, `GET /api/artworks/{id}/image`, and
+`PUT /api/projects/{id}/cover` with `{ "artwork_id": id }`. Ownership is checked for
+both the artwork and project. Public links expose only the active project cover.
+
+The Vault's **Search songs** matches partial titles, including Unicode case folding.
+Results show artwork, artist and project, with links and playback of the latest version.
+`GET /api/search/songs?q=...&offset=0` returns at most 50 results and has_more. Search
+scans only owned titles (appropriate for the local MVP), not private notes. Clear search
+to dismiss results. Requests are debounced and stale responses are ignored.
+
+Player subtitles use song artist, then project artist, then owner display name.
+Project and public-project responses now include owner_name, never the owner's email.
+Anonymous shared pages keep their existing theme control.

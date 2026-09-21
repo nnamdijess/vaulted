@@ -17,7 +17,7 @@ test('register, login errors, logout, protected routes and account isolation', a
   await page.getByLabel('Password').fill(password);
   await page.getByRole('button', { name: 'Create account', exact: true }).click();
   await expect(page).toHaveURL(/\/projects$/);
-  await expect(page.getByText('Account A', { exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Open profile', exact: true })).toBeVisible();
   const projectResponse = await page.request.post('/api/projects', { data: { name: 'A private album' } });
   expect(projectResponse.status()).toBe(201);
   const project = await projectResponse.json();
@@ -30,6 +30,7 @@ test('register, login errors, logout, protected routes and account isolation', a
   const cookie = (await page.context().cookies()).find(item => item.name === 'unreleased_session');
   expect(cookie?.httpOnly).toBe(true);
   expect(cookie?.sameSite).toBe('Lax');
+  await page.getByRole('link', { name: 'Open profile', exact: true }).click();
   await page.getByRole('button', { name: 'Log out', exact: true }).click();
   await expect(page).toHaveURL(/\/login$/);
   await expect(page.getByRole('complementary', { name: 'Audio player' })).not.toContainText('Private track');
@@ -49,7 +50,8 @@ test('register, login errors, logout, protected routes and account isolation', a
   await expect(page).toHaveURL(/\/projects$/);
   await expect(page.getByRole('heading', { name: 'A private album' })).toBeVisible();
   await page.reload();
-  await expect(page.getByText('Account A', { exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Open profile', exact: true })).toBeVisible();
+  await page.getByRole('link', { name: 'Open profile', exact: true }).click();
   await page.getByRole('button', { name: 'Log out', exact: true }).click();
   await expect(page).toHaveURL(/\/login$/);
   await page.goto('/register');
@@ -58,7 +60,7 @@ test('register, login errors, logout, protected routes and account isolation', a
   await page.getByLabel('Password').fill(password);
   await page.getByRole('button', { name: 'Create account', exact: true }).click();
   await expect(page).toHaveURL(/\/projects$/);
-  await expect(page.getByText('Account B', { exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Open profile', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'A private album' })).toHaveCount(0);
   await page.goto(`/projects/${project.id}`);
   await expect(page.locator('main').getByRole('alert')).toContainText('Project not found');

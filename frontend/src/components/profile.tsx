@@ -1,7 +1,7 @@
 "use client";
 import Link from 'next/link';
 import { FormEvent, useState } from 'react';
-import { AccountArea, PrivateArea, useAuth, User } from './auth-provider';
+import { AccountArea, LogoutButton, PrivateArea, useAuth, User } from './auth-provider';
 import { ThemeSwitch } from './theme-provider';
 import { ImageUpload } from './image-upload';
 import { api } from '@/lib/api';
@@ -20,7 +20,7 @@ function ProfileContent() {
       const body = new FormData(); body.set('file', file); setUser(await api<User>('/auth/avatar', { method: 'POST', body })); setEditing(false);
     }} onRemove={user?.avatar_path ? async () => { setUser(await api<User>('/auth/avatar', { method: 'DELETE' })); setEditing(false); } : undefined} />}
     <h2 className="profile-appearance">Appearance</h2><ThemeSwitch />{user && <PreferencesForm key={`${user.library_name}-${user.accent_color}`} user={user} onSave={setUser} />}
-    </section></main>;
+    <LogoutButton /></section></main>;
 }
 
 

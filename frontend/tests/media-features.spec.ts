@@ -19,14 +19,14 @@ test('mobile crop save/cancel, profile privacy controls, themes and waveform see
   await page.getByRole('button', { name: 'Change cover for Mobile album' }).tap();
   await page.getByLabel('Cover image', { exact: true }).setInputFiles(file);
   await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeEnabled();
-  await page.getByLabel('Zoom', { exact: true }).fill('2');
+  await page.getByLabel('Selection zoom', { exact: true }).fill('2');
   const crop = page.getByLabel('Square crop preview');
   await crop.scrollIntoViewIfNeeded();
   const beforeDrag = await crop.evaluate((canvas: HTMLCanvasElement) => canvas.toDataURL());
   const cropBox = (await crop.boundingBox())!;
   const cdp = await context.newCDPSession(page);
-  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: cropBox.x + 120, y: cropBox.y + 100 }] });
-  await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: cropBox.x + 175, y: cropBox.y + 100 }] });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: cropBox.x + cropBox.width / 2, y: cropBox.y + cropBox.height / 2 }] });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: cropBox.x + cropBox.width / 2 + 35, y: cropBox.y + cropBox.height / 2 }] });
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   await expect.poll(() => crop.evaluate((canvas: HTMLCanvasElement) => canvas.toDataURL())).not.toBe(beforeDrag);
 
@@ -54,7 +54,7 @@ test('mobile crop save/cancel, profile privacy controls, themes and waveform see
   await expect.poll(() => page.getByTestId('global-audio').evaluate((audio: HTMLAudioElement) => audio.currentTime)).toBeGreaterThan(1.5);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath('mobile-album.png') });
-  await page.getByRole('link', { name: 'Test owner', exact: true }).tap();
+  await page.getByRole('link', { name: 'Open profile', exact: true }).tap();
   await expect(page).toHaveURL(/\/profile$/);
   await page.getByRole('button', { name: 'Change profile picture' }).tap();
   await page.getByLabel('Profile picture', { exact: true }).setInputFiles(file);

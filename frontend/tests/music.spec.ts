@@ -134,10 +134,8 @@ test("upload-first project, track actions and persistent sequential playback", a
   await page.getByRole("button", { name: "Play All" }).click();
   const player = page.getByRole("complementary", { name: "Audio player" });
   await expect(player.getByRole("link")).toHaveText("Renamed demo");
-  await page.getByLabel("Theme", { exact: true }).selectOption("light");
   await expect(player.getByRole("button", { name: "Previous track" })).toBeDisabled();
   await expect(player.getByRole("button", { name: "Next track" })).toBeEnabled();
-  await page.getByLabel("Theme", { exact: true }).selectOption("dark");
   await expect.poll(() => audio.evaluate((element: HTMLAudioElement) => element.currentTime)).toBeGreaterThan(0);
   await player.getByRole("button", { name: "Pause playback" }).click();
   await page.getByRole("slider", { name: "Seek audio" }).fill("2.8");

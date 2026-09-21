@@ -10,7 +10,7 @@ import { Modal } from "./modal";
 import { SongActions } from "./song-actions";
 import { ProjectActions, ProjectAction } from "./project-actions";
 import { ProjectCover } from "./project-cover";
-import { ThemeSwitch } from "./theme-provider";
+import { SongSearch } from "./song-search";
 import { AccountArea, PrivateArea, useAuth } from './auth-provider';
 
 export function MusicWorkspace({ projectId, songId }: { projectId?: string; songId?: string }) {
@@ -93,7 +93,7 @@ function WorkspaceContent({ projectId, songId }: { projectId?: string; songId?: 
   }
 
   return <main>
-    <header><Link href="/" className="brand">vaulted<span className="dot">.</span></Link><div><AccountArea /><ThemeSwitch /></div></header>
+    <header><Link href="/" className="brand">vaulted<span className="dot">.</span></Link><AccountArea /></header>
     <nav aria-label="Breadcrumb"><Link href="/projects">{libraryName}</Link>{project && <> / <Link href={`/projects/${project.id}`}>{project.name}</Link></>}{song && <> / <span>{song.title}</span></>}</nav>
     {error && <div className="error" role="alert">{error} <button onClick={() => { setError(""); setLoading(true); setRevision((value) => value + 1); }}>Retry</button></div>}
     {notice && <p className="notice" role="status">{notice}</p>}
@@ -105,7 +105,7 @@ function WorkspaceContent({ projectId, songId }: { projectId?: string; songId?: 
       <div className="version-list">{versions.map((version) => <article className="version-row" key={version.id}>
         <button className="row-play" aria-label={`Play ${version.version_name}`} onClick={() => {
           if (player.current?.versionId === version.id) player.toggle();
-          else player.playQueue([{ songId: song.id, title: song.title, artist: song.artist, versionId: version.id, projectId: song.project_id, coverUrl: projectCoverUrl(project) }]);
+          else player.playQueue([{ songId: song.id, title: song.title, artist: song.artist, fallbackArtist: project?.artist || project?.owner_name || "", versionId: version.id, projectId: song.project_id, coverUrl: projectCoverUrl(project) }]);
         }}>{player.current?.versionId === version.id && player.playing ? "Ⅱ" : "▶"}</button>
         <div><h3>{version.version_name}</h3><p className="muted">{version.original_filename} · {new Date(version.created_at).toLocaleDateString()}</p>{version.notes && <p className="notes">{version.notes}</p>}</div>
       </article>)}</div>
@@ -132,6 +132,7 @@ function WorkspaceContent({ projectId, songId }: { projectId?: string; songId?: 
       {!songs.length && <div className="empty"><h2>Start with the music.</h2><p>Add one or several recordings. Names come from your files; details can wait.</p><button className="secondary" onClick={() => openDialog("tracks")}>Add Tracks</button></div>}
     </> : <>
       <div className="section-heading"><div><p className="eyebrow">YOUR MUSIC, IN PROGRESS</p><h1>{libraryName}</h1></div><button onClick={() => openDialog("project")}>＋ New Project</button></div>
+      <SongSearch />
       <div className="project-grid">{projects.map((item) => <Link className="project-tile" href={`/projects/${item.id}`} key={item.id}><ProjectCover project={item} /><h2>{item.name}</h2><p className="muted">{item.artist || libraryName}</p></Link>)}</div>
       {!projects.length && <p className="empty">Create a project, then add your recordings.</p>}
     </>}

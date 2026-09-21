@@ -39,8 +39,7 @@ export function PrivateArea({ children }: { children: React.ReactNode }) {
   return children;
 }
 
-export function AccountArea() {
-  const { user } = useAuth();
+export function LogoutButton() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   async function logout() {
@@ -52,12 +51,17 @@ export function AccountArea() {
       window.location.assign('/login');
     } catch { setError('Could not log out. Please try again.'); setBusy(false); }
   }
-  return <div className="account-area">{user ? <><Link href="/profile" className="profile-link" title="Open your profile"><AccountPicture path={user.avatar_path} /><span>{user.display_name || user.email}</span></Link><button onClick={logout} disabled={busy}>Log out</button></> : <Link href="/login">Log in</Link>}{error && <span role="alert">{error}</span>}</div>;
+  return <div><button onClick={logout} disabled={busy}>Log out</button>{error && <p role="alert">{error}</p>}</div>;
 }
 
 
 function AccountPicture({ path }: { path: string | null }) {
-  if (!path) return null;
+  if (!path) return <span className="account-picture avatar-fallback" aria-hidden="true">●</span>;
   // eslint-disable-next-line @next/next/no-img-element -- authenticated local avatar
   return <img className="account-picture" src={`/api/auth/avatar?v=${encodeURIComponent(path)}`} alt="" />;
+}
+
+export function AccountArea() {
+  const { user } = useAuth();
+  return <div className="account-area">{user ? <Link href="/profile" className="profile-link" aria-label="Open profile"><AccountPicture path={user.avatar_path} /></Link> : <Link href="/login">Log in</Link>}</div>;
 }

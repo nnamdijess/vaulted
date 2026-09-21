@@ -130,10 +130,12 @@ test('artwork and notes dialogs, shared listening without owner controls, insigh
   await expect(friend.getByRole('main').getByRole('alert')).toContainText('unavailable');
   await context.close();
   await page.getByRole('button', { name: 'Close dialog' }).click();
+  await page.getByRole('link', { name: 'Open profile', exact: true }).click();
   await page.getByLabel('Theme', { exact: true }).selectOption('light');
   await page.screenshot({ path: test.info().outputPath('album-light.png'), fullPage: true });
   await page.getByLabel('Theme', { exact: true }).selectOption('dark');
   await page.screenshot({ path: test.info().outputPath('album-dark.png'), fullPage: true });
+  await page.goto(`/projects/${project.id}`);
   await page.getByRole('button', { name: 'Project actions', exact: true }).click();
   await page.getByRole('button', { name: 'Insights', exact: true }).click();
   await expect(page.getByRole('dialog')).toContainText('1 total streams');
@@ -161,7 +163,7 @@ test('SSR controls and system/light/dark themes hydrate deterministically and pe
   expect(html).toMatch(/aria-label="Previous track" disabled=""/);
   expect(html).toMatch(/aria-label="Next track" disabled=""/);
   await page.emulateMedia({ colorScheme: 'light' });
-  await page.goto('/');
+  await page.goto('/profile');
   await expect(page.locator('.theme-scope')).toHaveAttribute('data-theme', 'system');
   await expect(page.locator('.theme-scope')).toHaveCSS('background-color', 'rgb(247, 248, 244)');
   await expect(page.getByRole('button', { name: 'Previous track' })).toBeDisabled();

@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { QueueTrack, usePlayer } from './audio-player';
 import { ThemeSwitch } from './theme-provider';
 
-type SharedProject = { name: string; artist: string; has_cover: boolean; allow_downloads: boolean; tracks: { id: number; title: string; artist: string; position: number; playable: boolean }[] };
+type SharedProject = { owner_name: string; name: string; artist: string; has_cover: boolean; allow_downloads: boolean; tracks: { id: number; title: string; artist: string; position: number; playable: boolean }[] };
 export function SharedProjectView({ token }: { token: string }) {
   const [project, setProject] = useState<SharedProject | null>(null);
   const [error, setError] = useState('');
@@ -18,7 +18,7 @@ export function SharedProjectView({ token }: { token: string }) {
     }).catch((err) => { if (active) setError(err.message); });
     return () => { active = false; };
   }, [base]);
-  const queue: QueueTrack[] = project?.tracks.filter((song) => song.playable).map((song) => ({ songId: song.id, title: song.title, artist: song.artist || project.artist, versionId: 0, publicToken: token, coverUrl: project.has_cover ? `${base}/cover` : undefined })) ?? [];
+  const queue: QueueTrack[] = project?.tracks.filter((song) => song.playable).map((song) => ({ songId: song.id, title: song.title, artist: song.artist || project.artist || project.owner_name, versionId: 0, publicToken: token, coverUrl: project.has_cover ? `${base}/cover` : undefined })) ?? [];
   return <main><header><span className="brand">vaulted<span className="dot">.</span></span><ThemeSwitch /></header>
     {error ? <p className="error" role="alert">{error}</p> : !project ? <p>Loading shared project…</p> : <>
       <section className="album-header"><div className="album-cover">{project.has_cover
