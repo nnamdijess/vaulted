@@ -161,3 +161,37 @@ select { padding: 10px; border: 1px solid var(--border); border-radius: 8px; fon
 .crop-editor input[type="range"] { padding: 0; height: 24px; }
 .crop-editor + .dialog-buttons { margin-top: 12px; }
 button, a, input[type="range"] { touch-action: manipulation; }
+/* Per-account accents use separate light/dark shades for readable controls. */
+.account-scope { --accent-dark: #c8f58b; --accent-light: #527936; --accent: var(--accent-dark); }
+.account-scope[data-accent="blue"] { --accent-dark: #90caff; --accent-light: #2463a0; }
+.account-scope[data-accent="purple"] { --accent-dark: #c8acff; --accent-light: #7044aa; }
+.account-scope[data-accent="pink"] { --accent-dark: #f9add0; --accent-light: #a83269; }
+.account-scope[data-accent="orange"] { --accent-dark: #ffc084; --accent-light: #975014; }
+.account-scope[data-accent="teal"] { --accent-dark: #83dfd0; --accent-light: #196e64; }
+.theme-scope[data-theme="light"] .account-scope { --accent: var(--accent-light); }
+@media(prefers-color-scheme:light) { .theme-scope[data-theme="system"] .account-scope { --accent: var(--accent-light); } }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.drag-handle { padding: 0; min-height: 44px; background: transparent; color: var(--muted) !important; touch-action: none; cursor: grab; border-radius: 6px; position: relative; }
+.drag-handle .grip { display: none; }
+.drag-handle:hover span:first-child, .drag-handle:focus-visible span:first-child, .is-dragging .drag-handle span:first-child { display: none; }
+.drag-handle:hover .grip, .drag-handle:focus-visible .grip, .is-dragging .drag-handle .grip { display: inline; font-size: 20px; }
+.is-dragging { background: var(--control); outline: 1px solid var(--accent); border-radius: 8px; }
+.reorder-help { font-size: 11px; }
+.audio-dock { left: 0; right: 0; bottom: 12px; width: calc(100% - 24px); max-width: 1100px; margin: auto; border: 1px solid var(--border); border-radius: 22px; padding: 9px 16px; gap: 16px; box-shadow: 0 5px 24px #0002; }
+.waveform { height: 40px; }
+.waveform svg { height: 28px; }
+.waveform-ready input { height: 40px; }
+.waveform-status { font-size: 9px; }
+@media(max-width:700px) {
+  .audio-dock { grid-template-columns: minmax(74px,.9fr) auto minmax(80px,1fr); width: calc(100% - 16px); bottom: max(8px, env(safe-area-inset-bottom)); padding: 7px 10px; gap: 6px; border-radius: 20px; }
+  .timeline { grid-column: auto; gap: 0; }
+  .timeline > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .transport .icon-button { min-width: 28px; min-height: 40px; width: 28px; padding: 2px; }
+  .transport .play-button { width: 36px; height: 36px; }
+  .now-playing { gap: 6px; }
+  .mini-cover { width: 28px; height: 28px; border-radius: 6px; }
+  .now-playing a, .now-playing strong { font-size: 11px; }
+  .now-playing small { font-size: 9px; margin-top: 3px; }
+  .waveform-status { position: absolute; bottom: 0; left: 12px; right: 12px; font-size: 8px; }
+  main { padding-bottom: 110px; }
+}

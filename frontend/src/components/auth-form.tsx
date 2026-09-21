@@ -17,7 +17,7 @@ export function AuthForm({ register = false }: { register?: boolean }) {
       window.location.assign(next && /^\/(projects|songs|profile)(\/\d+)?$/.test(next) ? next : '/projects');
     } catch (err) { setError(err instanceof Error ? err.message : 'Unable to sign in.'); setBusy(false); }
   }
-  return <main><header><Link href="/" className="brand">unreleased<span className="dot">.</span></Link><ThemeSwitch /></header>
+  return <main><header><Link href="/" className="brand">vaulted<span className="dot">.</span></Link><ThemeSwitch /></header>
     <section className="auth-panel"><h1>{register ? 'Create your account' : 'Welcome back'}</h1>
       <p className="muted">Your private music workspace.</p>
       <form onSubmit={submit}>

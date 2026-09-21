@@ -146,7 +146,7 @@ test('artwork and notes dialogs, shared listening without owner controls, insigh
   await page.getByRole('button', { name: 'Project actions', exact: true }).click();
   await page.getByRole('button', { name: 'Delete project', exact: true }).click();
   await page.getByRole('button', { name: 'Delete project permanently', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Library', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Vault', exact: true })).toBeVisible();
   await expect(page.getByText('Nothing playing', { exact: true })).toBeVisible();
   expect((await request.get(`${api}/projects/${project.id}`)).status()).toBe(404);
   expect((await request.get(`${api}/songs/${song.id}`)).status()).toBe(404);

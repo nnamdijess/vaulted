@@ -21,6 +21,7 @@ export function Waveform({ endpoint, elapsed, duration, onSeek }: { endpoint: st
     <div className={`waveform ${data ? 'waveform-ready' : ''}`}>
       {data && <svg data-testid="audio-waveform" viewBox={`0 0 ${data.peaks.length * 3} 48`} preserveAspectRatio="none" aria-label="Audio waveform" role="img">
         {data.peaks.map((peak, i) => { const height = Math.max(1, peak / maximum * 44); return <rect key={i} x={i * 3} y={(48 - height) / 2} width="2" height={height} fill={i / data.peaks.length <= elapsed / (duration || 1) ? 'var(--accent)' : 'var(--muted)'} />; })}
+        <line x1={Math.min(1, elapsed / (duration || 1)) * data.peaks.length * 3} x2={Math.min(1, elapsed / (duration || 1)) * data.peaks.length * 3} y1="0" y2="48" stroke="var(--accent)" strokeWidth="2" />
       </svg>}
       <input aria-label="Seek audio" aria-valuetext={`${Math.floor(elapsed)} of ${Math.floor(duration)} seconds`} type="range" min={0} max={duration || 0} step="0.1" value={Math.min(elapsed, duration)} disabled={!duration} onChange={event => onSeek(Number(event.target.value))} />
     </div>

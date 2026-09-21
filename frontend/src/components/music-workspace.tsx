@@ -5,18 +5,21 @@ import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, postJson, Project, projectCoverUrl, Song, Version } from "@/lib/api";
 import { QueueTrack, trackFor, usePlayer } from "./audio-player";
+import { OrderedTracks } from "./ordered-tracks";
 import { Modal } from "./modal";
 import { SongActions } from "./song-actions";
 import { ProjectActions, ProjectAction } from "./project-actions";
 import { ProjectCover } from "./project-cover";
 import { ThemeSwitch } from "./theme-provider";
-import { AccountArea, PrivateArea } from './auth-provider';
+import { AccountArea, PrivateArea, useAuth } from './auth-provider';
 
 export function MusicWorkspace({ projectId, songId }: { projectId?: string; songId?: string }) {
   return <PrivateArea><WorkspaceContent projectId={projectId} songId={songId} /></PrivateArea>;
 }
 
 function WorkspaceContent({ projectId, songId }: { projectId?: string; songId?: string }) {
+  const { user } = useAuth();
+  const libraryName = user?.library_name ?? "Vault";
   const [projectAction, setProjectAction] = useState<ProjectAction | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [project, setProject] = useState<Project | null>(null);
@@ -90,12 +93,12 @@ function WorkspaceContent({ projectId, songId }: { projectId?: string; songId?: 
   }
 
   return <main>
-    <header><Link href="/" className="brand">unreleased<span className="dot">.</span></Link><div><AccountArea /><ThemeSwitch /></div></header>
-    <nav aria-label="Breadcrumb"><Link href="/projects">Library</Link>{project && <> / <Link href={`/projects/${project.id}`}>{project.name}</Link></>}{song && <> / <span>{song.title}</span></>}</nav>
+    <header><Link href="/" className="brand">vaulted<span className="dot">.</span></Link><div><AccountArea /><ThemeSwitch /></div></header>
+    <nav aria-label="Breadcrumb"><Link href="/projects">{libraryName}</Link>{project && <> / <Link href={`/projects/${project.id}`}>{project.name}</Link></>}{song && <> / <span>{song.title}</span></>}</nav>
     {error && <div className="error" role="alert">{error} <button onClick={() => { setError(""); setLoading(true); setRevision((value) => value + 1); }}>Retry</button></div>}
     {notice && <p className="notice" role="status">{notice}</p>}
     {loading ? <p role="status">Loading your music…</p> : songId ? song && <>
-      <div className="section-heading"><div><p className="eyebrow">TRACK / {song.position}</p><h1>{song.title}</h1><p className="muted">{song.artist || project?.artist || "Your library"}</p></div><SongActions song={song} onChange={onChange} onDelete={onDelete} /></div>
+      <div className="section-heading"><div><p className="eyebrow">TRACK / {song.position}</p><h1>{song.title}</h1><p className="muted">{song.artist || project?.artist || libraryName}</p></div><SongActions song={song} onChange={onChange} onDelete={onDelete} /></div>
       <div className="metadata"><span>BPM: {song.bpm ?? "—"}</span><span>Key: {song.key || "—"}</span><span>Status: {song.status}</span></div>
       {song.notes && <p className="notes">{song.notes}</p>}
       <div className="section-heading"><h2>Versions ({versions.length})</h2><p className="muted">Use the track menu to add a version.</p></div>
@@ -110,21 +113,26 @@ function WorkspaceContent({ projectId, songId }: { projectId?: string; songId?: 
     </> : projectId ? project && <>
       <section className="album-header">
         <ProjectCover project={project} onClick={() => setProjectAction("Change cover")} />
-        <div><div className="project-heading"><p className="eyebrow">PROJECT</p><ProjectActions project={project} songs={songs} action={projectAction} setAction={setProjectAction} onChange={(updated) => { setProject(updated); player.updateProject(updated); }} onSort={() => setRevision((value) => value + 1)} /></div><h1>{project.name}</h1><p className="album-subtitle">{project.artist || "Your library"} <span>· {songs.length} {songs.length === 1 ? "track" : "tracks"}</span></p>
+        <div><div className="project-heading"><p className="eyebrow">PROJECT</p><ProjectActions project={project} songs={songs} action={projectAction} setAction={setProjectAction} onChange={(updated) => { setProject(updated); player.updateProject(updated); }} /></div><h1>{project.name}</h1><p className="album-subtitle">{project.artist || libraryName} <span>· {songs.length} {songs.length === 1 ? "track" : "tracks"}</span></p>
           {project.description && <p className="description">{project.description}</p>}
           <div className="album-buttons"><button disabled={!queue.length} onClick={() => player.playQueue(queue)}>▶ Play All</button><button className="secondary" onClick={() => openDialog("tracks")}>＋ Add Tracks</button></div>
         </div>
       </section>
-      <ol className="track-list" aria-label="Project tracks">{songs.map((item) => <li className={`track-row ${player.current?.songId === item.id ? "is-current" : ""}`} key={item.id}>
-        <span className="track-number">{item.position}</span>
+      <OrderedTracks songs={songs} currentId={player.current?.songId} onReorder={async ordered => {
+        try {
+          await api(`/projects/${projectId}/order`, { ...postJson({ song_ids: ordered.map(item => item.id) }), method: 'PATCH' });
+          const updated = ordered.map((item, index) => ({ ...item, position: index + 1 }));
+          setSongs(updated); player.reorderProject(Number(projectId), updated.map(item => item.id));
+        } catch (err) { setError(err instanceof Error ? err.message : 'Could not save track order'); setRevision(value => value + 1); throw err; }
+      }}>{item => <>
         <button className="row-play" aria-label={`${player.current?.songId === item.id && player.playing ? "Pause" : "Play"} ${item.title}`} disabled={!item.latest_version_id} onClick={() => playSong(item)}>{player.current?.songId === item.id && player.playing ? "Ⅱ" : "▶"}</button>
         <div className="track-title"><Link href={`/songs/${item.id}`}>{item.title}</Link><time dateTime={item.created_at}>Uploaded {new Date(item.created_at).toLocaleDateString()}</time></div>
         <SongActions song={item} onChange={onChange} onDelete={onDelete} />
-      </li>)}</ol>
+      </>}</OrderedTracks>
       {!songs.length && <div className="empty"><h2>Start with the music.</h2><p>Add one or several recordings. Names come from your files; details can wait.</p><button className="secondary" onClick={() => openDialog("tracks")}>Add Tracks</button></div>}
     </> : <>
-      <div className="section-heading"><div><p className="eyebrow">YOUR MUSIC, IN PROGRESS</p><h1>Library</h1></div><button onClick={() => openDialog("project")}>＋ New Project</button></div>
-      <div className="project-grid">{projects.map((item) => <Link className="project-tile" href={`/projects/${item.id}`} key={item.id}><ProjectCover project={item} /><h2>{item.name}</h2><p className="muted">{item.artist || "Your library"}</p></Link>)}</div>
+      <div className="section-heading"><div><p className="eyebrow">YOUR MUSIC, IN PROGRESS</p><h1>{libraryName}</h1></div><button onClick={() => openDialog("project")}>＋ New Project</button></div>
+      <div className="project-grid">{projects.map((item) => <Link className="project-tile" href={`/projects/${item.id}`} key={item.id}><ProjectCover project={item} /><h2>{item.name}</h2><p className="muted">{item.artist || libraryName}</p></Link>)}</div>
       {!projects.length && <p className="empty">Create a project, then add your recordings.</p>}
     </>}
     {dialog && <Modal title={dialog === "tracks" ? "Add Tracks" : "New Project"} onClose={() => setDialog(null)} busy={busy}>
@@ -135,6 +143,6 @@ function WorkspaceContent({ projectId, songId }: { projectId?: string; songId?: 
         <div className="dialog-buttons"><button className="secondary" type="button" onClick={() => setDialog(null)}>Cancel</button><button type="submit">{busy ? "Saving…" : dialog === "tracks" ? "Upload tracks" : "Create project"}</button></div>
       </fieldset></form>
     </Modal>}
-    <footer>UNRELEASED <span>Your local music workspace.</span></footer>
+    <footer>VAULTED <span>Your local music workspace.</span></footer>
   </main>;
 }

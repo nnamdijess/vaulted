@@ -18,6 +18,7 @@ type Player = {
   toggle: () => void;
   updateSong: (song: Song) => void;
   updateProject: (project: Project) => void;
+  reorderProject: (projectId: number, songIds: number[]) => void;
   removeSong: (songId: number) => void;
   removeSongs: (songIds: number[]) => void;
 };
@@ -95,6 +96,14 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
       ? { ...track, coverUrl: projectCoverUrl(project) } : track);
     setQueue(queueRef.current);
   }
+  function reorderProject(projectId: number, songIds: number[]) {
+    if (!queueRef.current.length || queueRef.current.some(track => track.projectId !== projectId || track.publicToken)) return;
+    const selected = queueRef.current[indexRef.current];
+    const positions = new Map(songIds.map((id, index) => [id, index]));
+    queueRef.current = [...queueRef.current].sort((a,b) => (positions.get(a.songId) ?? Infinity) - (positions.get(b.songId) ?? Infinity));
+    indexRef.current = Math.max(0, queueRef.current.indexOf(selected));
+    setQueue(queueRef.current); setIndex(indexRef.current);
+  }
   function removeSong(songId: number) {
     removeSongs([songId]);
   }
@@ -117,7 +126,7 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
     }
   }
 
-  return <Context.Provider value={{ current, playing, playQueue, toggle, updateSong, updateProject, removeSong, removeSongs }}>
+  return <Context.Provider value={{ current, playing, playQueue, toggle, updateSong, updateProject, reorderProject, removeSong, removeSongs }}>
     {children}
     <aside className="audio-dock" aria-label="Audio player">
       <audio ref={audio} data-testid="global-audio" preload="metadata"
@@ -130,7 +139,7 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
         onError={() => { setPlaying(false); setError("Unable to play this file. Check the backend and browser codec support."); }} />
       <div className="now-playing"><PlayerArtwork key={current?.coverUrl ?? 'placeholder'} src={current?.coverUrl} title={current?.title ?? 'current track'} /><div>
         {current ? <Link href={current.publicToken ? `/share/${current.publicToken}` : `/songs/${current.songId}`}>{current.title}</Link> : <strong>Nothing playing</strong>}
-        <small>{current?.artist || (current ? "Unreleased" : "Choose a track to listen")}</small>
+        <small>{current?.artist || (current ? "Vaulted" : "Choose a track to listen")}</small>
       </div></div>
       <div className="transport">
         <button className="icon-button" aria-label="Previous track" disabled={!canPrevious} onClick={() => move(-1)}>⏮</button>

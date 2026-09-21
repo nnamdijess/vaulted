@@ -10,6 +10,9 @@ def upgrade_local_database(engine: Engine) -> None:
         connection.exec_driver_sql("BEGIN IMMEDIATE")
         if inspect(connection).has_table('users'):
             user_columns = {c['name'] for c in inspect(connection).get_columns('users')}
+            for name, definition in {'library_name': "VARCHAR(60) NOT NULL DEFAULT 'Vault'", 'accent_color': "VARCHAR(20) NOT NULL DEFAULT 'green'"}.items():
+                if name not in user_columns:
+                    connection.exec_driver_sql(f'ALTER TABLE users ADD COLUMN {name} {definition}')
             if 'avatar_path' not in user_columns:
                 connection.exec_driver_sql('ALTER TABLE users ADD COLUMN avatar_path VARCHAR(255)')
         project_columns = {column["name"] for column in inspect(connection).get_columns("projects")}

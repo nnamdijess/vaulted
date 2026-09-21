@@ -1,4 +1,4 @@
-# Unreleased
+# Vaulted
 
 A self-hosted workspace for unreleased music, inspired by Untitled.
 
@@ -179,8 +179,8 @@ From `backend/`, run the legacy database preservation test:
 
 ## Current limitations
 
-- No drag-and-drop reordering or editing existing version notes yet. Project menus support
-  sorting, settings, notes, artwork, insights, sharing and deletion.
+- Existing version notes cannot yet be edited. Project menus support
+  settings, notes, artwork, insights, sharing and deletion.
 - Play queues are snapshots. Press Play All again to include new uploads or latest versions.
 - Private workspaces require login. Share pages remain anonymous read-only token links.
   Future hosting requires HTTPS and secure cookies; see the authentication guide.
@@ -189,7 +189,7 @@ From `backend/`, run the legacy database preservation test:
   MP3 are good choices for the first test.
 - Upload size is checked while copying from the multipart temporary file; this
   is not a server-wide request-body limit. No resumable uploads or progress bar.
-- No pagination, full migration framework, waveform display, or automatic media
+- No pagination, full migration framework or automatic media
   cleanup on manual database changes. Song deletion removes stored audio after
   committing metadata deletion; a filesystem failure is logged and can leave an
   orphaned file for manual cleanup. Back up the database and uploads together.
@@ -207,3 +207,19 @@ Framework references: [Next.js installation](https://nextjs.org/docs/app/getting
 and [FastAPI first steps](https://fastapi.tiangolo.com/tutorial/first-steps/).
 
 See [cropping, profiles, mobile preview and waveforms](docs/media-profile-mobile.md) for the latest controls and exact same-Wi-Fi setup instructions.
+
+## Vaulted appearance and organization
+
+The app is now named Vaulted. Existing repository paths, accounts and uploads are unchanged.
+Your library defaults to **Vault**. Open your profile to change its label and choose
+green, blue, purple, pink, orange or teal accents. These preferences are saved to
+your account and work with Light, Dark and System themes.
+
+Drag a track number with a mouse or touch to reorder songs. The order saves on drop
+and is reflected in public shares and the current project queue without restarting
+the playing song. Keyboard: focus a track number, Space to pick up, arrows to move,
+Enter to save, Escape to cancel. This replaces the Sort tracks dialog.
+
+The persistent player now uses a compact floating dock and shorter real-audio
+waveform with a playhead. On phones, elapsed/duration text is visually hidden to
+leave room for track information, playback controls and seeking in one row.

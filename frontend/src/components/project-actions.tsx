@@ -7,13 +7,13 @@ import { ImageUpload } from './image-upload';
 import { Modal } from './modal';
 import { usePlayer } from './audio-player';
 
-export type ProjectAction = 'Insights' | 'Notes' | 'Share project' | 'Change cover' | 'Sort tracks' | 'Project settings' | 'Delete project';
+export type ProjectAction = 'Insights' | 'Notes' | 'Share project' | 'Change cover' | 'Project settings' | 'Delete project';
 type Share = { enabled: boolean; allow_downloads: boolean; token: string | null };
 type Insights = { total: number; owner: number; shared: number; most_played: string | null; songs: { id: number; title: string; streams: number }[]; recent: { title: string; source: string; timestamp: string }[] };
 
-export function ProjectActions({ project, songs, action, setAction, onChange, onSort }: {
+export function ProjectActions({ project, songs, action, setAction, onChange }: {
   project: Project; songs: Song[]; action: ProjectAction | null; setAction: (action: ProjectAction | null) => void;
-  onChange: (project: Project) => void; onSort: () => void;
+  onChange: (project: Project) => void;
 }) {
   const [menu, setMenu] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -49,13 +49,6 @@ export function ProjectActions({ project, songs, action, setAction, onChange, on
       if (action === 'Share project') { await saveShare({ enabled: data.has('enabled'), allow_downloads: data.has('allow_downloads'), token: share?.token ?? null }); return; }
       if (action === 'Notes') onChange(await api<Project>(`/projects/${project.id}/notes`, { ...postJson({ notes: value('notes') }), method: 'PATCH' }));
       if (action === 'Project settings') onChange(await api<Project>(`/projects/${project.id}`, { ...postJson(Object.fromEntries(data)), method: 'PATCH' }));
-      if (action === 'Sort tracks') {
-        const ordered = [...songs];
-        if (value('sort') === 'title') ordered.sort((a,b) => a.title.localeCompare(b.title));
-        else ordered.sort((a,b) => value('sort') === 'oldest' ? a.id-b.id : b.id-a.id);
-        await api(`/projects/${project.id}/order`, { ...postJson({ song_ids: ordered.map((song) => song.id) }), method: 'PATCH' });
-        onSort();
-      }
       if (action === 'Delete project') {
         await api(`/projects/${project.id}`, { method: 'DELETE' });
         player.removeSongs(songs.map((song) => song.id));
@@ -74,7 +67,7 @@ export function ProjectActions({ project, songs, action, setAction, onChange, on
   return <div className="song-actions">
     <button className="icon-button" aria-label="Project actions" aria-expanded={menu} onClick={() => setMenu(!menu)}>•••</button>
     {menu && <><button className="menu-dismiss" aria-label="Close project actions" onClick={() => setMenu(false)} /><div className="actions-menu">
-      {(['Insights','Notes','Share project','Change cover','Sort tracks','Project settings','Delete project'] as ProjectAction[]).map((item) => <button key={item} onClick={() => { setError(''); setShare(null); setInsights(null); setAction(item); setMenu(false); }}>{item}</button>)}
+      {(['Insights','Notes','Share project','Change cover','Project settings','Delete project'] as ProjectAction[]).map((item) => <button key={item} onClick={() => { setError(''); setShare(null); setInsights(null); setAction(item); setMenu(false); }}>{item}</button>)}
     </div></>}
     {action && <Modal title={action} busy={busy} onClose={() => { setAction(null); setError(''); }}>
       {error && <p className="error" role="alert">{error}</p>}
@@ -91,7 +84,7 @@ export function ProjectActions({ project, songs, action, setAction, onChange, on
 
         {action === 'Notes' && <><p className="muted">Private project notes. Never included in share links.</p><label>Project notes<textarea name="notes" defaultValue={project.notes} maxLength={10000} rows={8} /></label></>}
         {action === 'Project settings' && <><label>Project name<input name="name" defaultValue={project.name} required maxLength={200} /></label><label>Artist / owner<input name="artist" defaultValue={project.artist} maxLength={200} /></label><label>Description<textarea name="description" defaultValue={project.description} maxLength={10000} /></label></>}
-        {action === 'Sort tracks' && <label>Track order<select name="sort"><option value="title">Title A–Z</option><option value="oldest">Oldest upload first</option><option value="newest">Newest upload first</option></select></label>}
+
         {action === 'Delete project' && <p>Delete “{project.name}”, its tracks, artwork, versions and listening history? This cannot be undone.</p>}
         {action === 'Share project' && (share ? <div key={`${share.token}-${share.enabled}-${share.allow_downloads}`}>
           <p className="muted">Anyone with the link can listen. Notes stay private.</p>

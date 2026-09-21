@@ -5,7 +5,7 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 
-export type User = { id: number; email: string; display_name: string; avatar_path: string | null };
+export type User = { id: number; email: string; display_name: string; avatar_path: string | null; library_name: string; accent_color: 'green' | 'blue' | 'purple' | 'pink' | 'orange' | 'teal' };
 type Auth = { user: User | null; loading: boolean; setUser: (user: User) => void };
 const Context = createContext<Auth | null>(null);
 
@@ -19,7 +19,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, []);
-  return <Context.Provider value={{ user, loading, setUser }}>{children}</Context.Provider>;
+  return <Context.Provider value={{ user, loading, setUser }}><div className="account-scope" data-accent={user?.accent_color ?? "green"}>{children}</div></Context.Provider>;
 }
 
 export function useAuth() {

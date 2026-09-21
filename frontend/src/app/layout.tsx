@@ -5,7 +5,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/components/auth-provider";
 
 export const metadata: Metadata = {
-  title: "Unreleased",
+  title: "Vaulted",
   description: "A home for your music in progress.",
 };
 

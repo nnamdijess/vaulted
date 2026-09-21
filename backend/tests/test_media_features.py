@@ -85,3 +85,23 @@ class MediaFeaturesTest(unittest.TestCase):
         upgrade_local_database(self.engine)
         self.assertIsNone(self.client.get('/api/auth/me').json()['avatar_path'])
         self.assertEqual(self.client.get(f"/api/projects/{project['id']}").json()['name'],'Preserve')
+
+    def test_preferences_are_validated_private_and_migrate_additively(self):
+        from app.db.migrations import upgrade_local_database
+        self.register(self.client)
+        self.register(self.other,'other@example.com')
+        data = {'library_name':' Night sessions ', 'accent_color':'blue'}
+        self.assertEqual(self.public.patch('/api/auth/preferences',json=data).status_code,401)
+        response = self.client.patch('/api/auth/preferences',json=data)
+        self.assertEqual(response.status_code,200)
+        self.assertEqual(response.json()['library_name'],'Night sessions')
+        self.assertEqual(self.client.get('/api/auth/me').json()['accent_color'],'blue')
+        self.assertEqual(self.other.get('/api/auth/me').json()['library_name'],'Vault')
+        for bad in [{**data,'library_name':' '},{**data,'library_name':'x'*61},{**data,'accent_color':'invalid'},{**data,'owner_id':1}]:
+            self.assertEqual(self.client.patch('/api/auth/preferences',json=bad).status_code,422)
+        with self.engine.begin() as connection:
+            connection.exec_driver_sql('ALTER TABLE users DROP COLUMN library_name')
+            connection.exec_driver_sql('ALTER TABLE users DROP COLUMN accent_color')
+        upgrade_local_database(self.engine); upgrade_local_database(self.engine)
+        me = self.client.get('/api/auth/me').json()
+        self.assertEqual((me['library_name'],me['accent_color']),('Vault','green'))

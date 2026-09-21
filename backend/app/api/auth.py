@@ -1,7 +1,7 @@
 import hashlib
 import secrets
 from datetime import timedelta
-from typing import Annotated
+from typing import Annotated, Literal
 
 from argon2 import PasswordHasher
 from argon2.exceptions import VerificationError, InvalidHashError
@@ -49,7 +49,7 @@ def token_hash(token):
 
 
 def account(user):
-    return {'id': user.id, 'email': user.email, 'display_name': user.display_name, 'avatar_path': user.avatar_path}
+    return {'id': user.id, 'email': user.email, 'display_name': user.display_name, 'avatar_path': user.avatar_path, 'library_name': user.library_name, 'accent_color': user.accent_color}
 
 
 def current_user(request: Request):
@@ -161,4 +161,19 @@ def remove_avatar(db=Depends(owned_session)):
     user.avatar_path = None
     db.commit()
     remove_files([old])
+    return account(user)
+
+
+class Preferences(BaseModel):
+    model_config = ConfigDict(extra='forbid', str_strip_whitespace=True)
+    library_name: str = Field(min_length=1, max_length=60)
+    accent_color: Literal['green', 'blue', 'purple', 'pink', 'orange', 'teal']
+
+
+@router.patch('/preferences')
+def preferences(data: Preferences, db=Depends(owned_session)):
+    user = db.get(User, db.info['owner_id'])
+    user.library_name = data.library_name
+    user.accent_color = data.accent_color
+    db.commit()
     return account(user)
