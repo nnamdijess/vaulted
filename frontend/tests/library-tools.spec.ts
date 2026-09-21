@@ -17,6 +17,7 @@ test('saved artwork reuse, private search, profile-only controls and artist subt
   await expect(page.getByRole('dialog')).toHaveCount(0);
   expect((await (await request.get(`${api}/projects/${project.id}`)).json()).cover_path).toBe(history[1].file_path);
   await page.goto('/projects');
+  await page.getByRole('button', { name: 'Search songs', exact: true }).click();
   await page.getByRole('searchbox', { name: 'Search songs' }).fill('NIGHT');
   const results = page.locator('.search-results');
   await expect(results.getByRole('link', { name: 'Midnight', exact: true })).toBeVisible();
@@ -27,6 +28,7 @@ test('saved artwork reuse, private search, profile-only controls and artist subt
   await results.getByRole('link', { name: 'Midnight', exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/songs/${song.id}$`));
   await page.goto('/projects');
+  await page.getByRole('button', { name: 'Search songs', exact: true }).click();
   await page.getByRole('searchbox', { name: 'Search songs' }).fill('missing song');
   await expect(page.getByText('No songs found.', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Clear search' }).click();
@@ -47,6 +49,7 @@ test('saved artwork reuse, private search, profile-only controls and artist subt
   await friend.reload(); await friend.getByRole('button', { name: 'Play All' }).click();
   await expect(friend.locator('.now-playing small')).toHaveText('Track artist');
   await context.close();
+  await page.getByRole('button', { name: 'Close dialog' }).click();
   await page.getByRole('link', { name: 'Open profile' }).click();
   await expect(page.getByLabel('Theme', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Log out', exact: true }).click();
@@ -61,7 +64,8 @@ test('full image crop keeps edges visible and saves only the resized selection',
     const ctx = canvas.getContext('2d')!; ctx.fillStyle = '#ff0000'; ctx.fillRect(0,0,300,300); ctx.fillStyle = '#0000ff'; ctx.fillRect(300,0,300,300);
     return canvas.toDataURL('image/png').split(',')[1];
   }), 'base64');
-  await page.getByRole('button', { name: 'Change profile picture' }).click();
+  await page.getByRole('button', { name: 'Profile picture options' }).click();
+  await page.getByRole('menuitem', { name: 'Change profile picture' }).click();
   await page.getByLabel('Profile picture', { exact: true }).setInputFiles({ name: 'wide.png', mimeType: 'image/png', buffer: picture });
   await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeEnabled();
   const crop = page.getByLabel('Square crop preview');
@@ -91,6 +95,7 @@ test('full image crop keeps edges visible and saves only the resized selection',
 
 test('search ignores stale responses and recovers from errors', async ({ page }) => {
   await page.goto('/projects');
+  await page.getByRole('button', { name: 'Search songs', exact: true }).click();
   let release: () => void = () => {};
   const gate = new Promise<void>(resolve => { release = resolve; });
   await page.route('**/api/search/songs?*', async route => {

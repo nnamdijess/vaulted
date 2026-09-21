@@ -192,3 +192,23 @@ to dismiss results. Requests are debounced and stale responses are ignored.
 Player subtitles use song artist, then project artist, then owner display name.
 Project and public-project responses now include owner_name, never the owner's email.
 Anonymous shared pages keep their existing theme control.
+
+## Header search and profile controls
+
+Use the search icon beside your avatar on any private workspace/profile page. It
+opens the existing song search in a focused dialog; Escape or Close returns focus
+to the icon. Opening a result closes the dialog; playback remains available inside
+it. Anonymous shared pages never expose private search. Dialogs follow the visual
+viewport and scroll internally when a phone keyboard reduces the available space.
+
+On your profile, tap the large picture (or fallback avatar) to reveal **Change
+profile picture**. Escape and outside clicks dismiss the menu. The upload editor
+still provides crop/save/cancel/remove. Logout is separated below the appearance
+form by a border and spacing, and the profile has bottom clearance for the player.
+
+Motion evaluation: the current React 19 / Next.js App Router setup satisfies
+Motion's React >=18.2 requirement. The optional `motion` package can animate these
+client components without changing CSS or adding Tailwind. A possible follow-up is
+short menu/dialog opacity transitions, respecting reduced motion and identical SSR
+initial markup. No new package or animation was added in this change; integration
+requires approval. Reference: https://motion.dev/docs/react-installation

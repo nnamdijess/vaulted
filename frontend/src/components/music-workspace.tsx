@@ -10,7 +10,6 @@ import { Modal } from "./modal";
 import { SongActions } from "./song-actions";
 import { ProjectActions, ProjectAction } from "./project-actions";
 import { ProjectCover } from "./project-cover";
-import { SongSearch } from "./song-search";
 import { AccountArea, PrivateArea, useAuth } from './auth-provider';
 
 export function MusicWorkspace({ projectId, songId }: { projectId?: string; songId?: string }) {
@@ -132,7 +131,6 @@ function WorkspaceContent({ projectId, songId }: { projectId?: string; songId?: 
       {!songs.length && <div className="empty"><h2>Start with the music.</h2><p>Add one or several recordings. Names come from your files; details can wait.</p><button className="secondary" onClick={() => openDialog("tracks")}>Add Tracks</button></div>}
     </> : <>
       <div className="section-heading"><div><p className="eyebrow">YOUR MUSIC, IN PROGRESS</p><h1>{libraryName}</h1></div><button onClick={() => openDialog("project")}>＋ New Project</button></div>
-      <SongSearch />
       <div className="project-grid">{projects.map((item) => <Link className="project-tile" href={`/projects/${item.id}`} key={item.id}><ProjectCover project={item} /><h2>{item.name}</h2><p className="muted">{item.artist || libraryName}</p></Link>)}</div>
       {!projects.length && <p className="empty">Create a project, then add your recordings.</p>}
     </>}

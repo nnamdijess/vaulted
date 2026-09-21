@@ -1,0 +1,38 @@
+import { expect } from '@playwright/test';
+import { test } from './fixtures';
+
+test('header search focus, profile menu and separated actions on mobile', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 393, height: 650 });
+  await page.goto('/profile');
+  await expect(page.getByRole('searchbox')).toHaveCount(0);
+  const search = page.getByRole('button', { name: 'Search songs', exact: true });
+  await search.click();
+  await expect(page.getByRole('searchbox')).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  await expect(page.getByRole('button', { name: 'Close dialog' })).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  await expect(page.getByRole('searchbox')).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(search).toBeFocused();
+  const avatar = page.getByRole('button', { name: 'Profile picture options' });
+  await expect(page.getByRole('menuitem')).toHaveCount(0);
+  await avatar.focus(); await page.keyboard.press('Enter');
+  await expect(page.getByRole('menuitem', { name: 'Change profile picture' })).toBeFocused();
+  await page.keyboard.press('Escape'); await expect(avatar).toBeFocused();
+  await avatar.click(); await page.getByRole('heading', { name: 'Your profile' }).click();
+  await expect(page.getByRole('menuitem')).toHaveCount(0);
+  await page.getByLabel('Theme', { exact: true }).selectOption('light');
+  const save = page.getByRole('button', { name: 'Save preferences' });
+  const logout = page.getByRole('button', { name: 'Log out' });
+  await logout.scrollIntoViewIfNeeded();
+  const saveBox = (await save.boundingBox())!, logoutBox = (await logout.boundingBox())!;
+  expect(logoutBox.y - saveBox.y - saveBox.height).toBeGreaterThan(24);
+  expect(await logout.evaluate(button => button.closest('form'))).toBeNull();
+  expect(logoutBox.y + logoutBox.height).toBeLessThan((await page.locator('.audio-dock').boundingBox())!.y);
+  await page.screenshot({ path: testInfo.outputPath('profile-actions-light.png') });
+  await page.getByLabel('Theme', { exact: true }).selectOption('dark');
+  await logout.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath('profile-actions-dark.png') });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});

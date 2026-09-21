@@ -56,7 +56,8 @@ test('mobile crop save/cancel, profile privacy controls, themes and waveform see
   await page.screenshot({ path: testInfo.outputPath('mobile-album.png') });
   await page.getByRole('link', { name: 'Open profile', exact: true }).tap();
   await expect(page).toHaveURL(/\/profile$/);
-  await page.getByRole('button', { name: 'Change profile picture' }).tap();
+  await page.getByRole('button', { name: 'Profile picture options' }).tap();
+  await page.getByRole('menuitem', { name: 'Change profile picture' }).tap();
   await page.getByLabel('Profile picture', { exact: true }).setInputFiles(file);
   await page.getByRole('button', { name: 'Save', exact: true }).tap();
   await expect(page.getByAltText('Your profile picture')).toBeVisible();
@@ -64,7 +65,8 @@ test('mobile crop save/cancel, profile privacy controls, themes and waveform see
   await expect(page.getByLabel('Theme', { exact: true })).toHaveValue('light');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath('mobile-profile.png') });
-  await page.getByRole('button', { name: 'Change profile picture' }).tap();
+  await page.getByRole('button', { name: 'Profile picture options' }).tap();
+  await page.getByRole('menuitem', { name: 'Change profile picture' }).tap();
   await page.getByRole('button', { name: 'Remove profile picture', exact: true }).tap();
   await expect(page.getByAltText('Your profile picture')).toHaveCount(0);
   expect(errors).toEqual([]);

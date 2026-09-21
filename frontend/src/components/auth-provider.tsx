@@ -1,6 +1,7 @@
 "use client";
 
 import Link from 'next/link';
+import { SearchButton } from './search-button';
 import { createContext, useContext, useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
@@ -51,7 +52,7 @@ export function LogoutButton() {
       window.location.assign('/login');
     } catch { setError('Could not log out. Please try again.'); setBusy(false); }
   }
-  return <div><button onClick={logout} disabled={busy}>Log out</button>{error && <p role="alert">{error}</p>}</div>;
+  return <div><button type="button" onClick={logout} disabled={busy}>Log out</button>{error && <p role="alert">{error}</p>}</div>;
 }
 
 
@@ -63,5 +64,5 @@ function AccountPicture({ path }: { path: string | null }) {
 
 export function AccountArea() {
   const { user } = useAuth();
-  return <div className="account-area">{user ? <Link href="/profile" className="profile-link" aria-label="Open profile"><AccountPicture path={user.avatar_path} /></Link> : <Link href="/login">Log in</Link>}</div>;
+  return <div className="account-area">{user ? <><SearchButton /><Link href="/profile" className="profile-link" aria-label="Open profile"><AccountPicture path={user.avatar_path} /></Link></> : <Link href="/login">Log in</Link>}</div>;
 }

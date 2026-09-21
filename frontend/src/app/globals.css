@@ -209,3 +209,13 @@ button, a, input[type="range"] { touch-action: manipulation; }
 .search-cover img { width: 48px; height: 48px; object-fit: cover; border-radius: 8px; }
 .song-search { margin: 24px 0; }
 .crop-preview { background: #222; cursor: move; }
+.profile-logout { margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--border); padding-bottom: 24px; }
+.profile-panel { padding-bottom: 100px; }
+.header-search { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; }
+.profile-picture-menu { position: relative; width: fit-content; }
+.profile-picture-trigger { padding: 0; background: transparent; border-radius: 50%; display: block; }
+.profile-picture-trigger .profile-picture { margin: 0; }
+.picture-menu { position: absolute; z-index: 5; top: calc(100% + 8px); left: 0; width: max-content; max-width: 85vw; padding: 8px; background: var(--control); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 8px 24px #0003; }
+.picture-menu button { min-height: 44px; }
+.modal { max-height: calc(100dvh - 32px); overflow-y: auto; overscroll-behavior: contain; }
+@media(max-width:700px) { .modal { margin-top: 16px; margin-bottom: 16px; } }
