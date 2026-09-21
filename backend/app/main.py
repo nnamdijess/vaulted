@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.library import router as library_router
 from app.api.health import router as health_router
 from app.core.config import settings
 from app.api.music import router as music_router
@@ -34,6 +35,7 @@ app.add_middleware(
     allow_headers=["Content-Type", "Range"],
     expose_headers=["Accept-Ranges", "Content-Range", "Content-Length"],
 )
+app.include_router(library_router, prefix="/api")
 app.include_router(health_router, prefix="/api")
 app.include_router(music_router, prefix="/api")
 app.include_router(project_router, prefix="/api")

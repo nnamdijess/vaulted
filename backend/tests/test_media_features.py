@@ -105,3 +105,48 @@ class MediaFeaturesTest(unittest.TestCase):
         upgrade_local_database(self.engine); upgrade_local_database(self.engine)
         me = self.client.get('/api/auth/me').json()
         self.assertEqual((me['library_name'],me['accent_color']),('Vault','green'))
+
+    def test_artwork_history_and_search_are_private_and_persistent(self):
+        from app.db.migrations import upgrade_local_database
+        self.register(self.client)
+        self.register(self.other, 'friend@example.com')
+        project = self.client.post('/api/projects',json={'name':'Album'}).json()
+        second = self.client.post('/api/projects',json={'name':'Another'}).json()
+        endpoint = f"/api/projects/{project['id']}/cover"
+        first = self.client.post(endpoint, files={'file':('a.png',self.image(),'image/png')}).json()
+        self.client.post(endpoint, files={'file':('b.png',self.image('blue'),'image/png')})
+        history = self.client.get('/api/artworks').json()
+        self.assertEqual(len(history),2)
+        original = next(a for a in history if a['file_path'] == first['cover_path'])
+        image_url = f"/api/artworks/{original['id']}/image"
+        self.assertEqual(self.other.get('/api/artworks').json(),[])
+        self.assertEqual(self.other.get(image_url).status_code,404)
+        self.assertEqual(self.public.get(image_url).status_code,401)
+        other_project = self.other.post('/api/projects',json={'name':'Private'}).json()
+        self.assertEqual(self.other.put(f"/api/projects/{other_project['id']}/cover",json={'artwork_id':original['id']}).status_code,404)
+        for target in (project, second):
+            self.assertEqual(self.client.put(f"/api/projects/{target['id']}/cover",json={'artwork_id':original['id']}).status_code,200)
+        token = self.client.put(f"/api/projects/{second['id']}/share",json={'enabled':True}).json()['token']
+        self.assertEqual(self.public.get(f'/api/public/{token}/cover').content,self.client.get(image_url).content)
+        self.client.delete(endpoint)
+        self.client.delete(f"/api/projects/{project['id']}")
+        self.assertEqual(self.client.get(image_url).status_code,200)
+        self.assertEqual(self.public.get(f'/api/public/{token}/cover').status_code,200)
+        song = self.client.post(f"/api/projects/{second['id']}/songs",json={'title':'Straße NIGHT', 'notes':'secret note'}).json()
+        result = self.client.get('/api/search/songs?q=STRASSE').json()['items']
+        self.assertEqual(result[0]['id'],song['id'])
+        self.assertEqual(result[0]['artist'],'Owner')
+        self.assertNotIn('notes',result[0])
+        self.assertEqual(self.other.get('/api/search/songs?q=night').json()['items'],[])
+        self.assertEqual(self.public.get('/api/search/songs?q=night').status_code,401)
+        self.assertEqual(self.client.get('/api/search/songs?q=%25').json()['items'],[])
+        self.assertEqual(self.client.get('/api/search/songs?q=').json()['items'],[])
+        shared = self.public.get(f'/api/public/{token}').json()
+        self.assertEqual(shared['owner_name'],'Owner')
+        self.assertNotIn('email',str(shared))
+        # Simulate existing artwork before the history table was introduced.
+        with self.engine.begin() as db:
+            db.exec_driver_sql('DELETE FROM artworks')
+        upgrade_local_database(self.engine); upgrade_local_database(self.engine)
+        self.assertEqual(len(self.client.get('/api/artworks').json()),1)
+        self.assertEqual(self.client.get(image_url).status_code,200)

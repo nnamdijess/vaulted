@@ -56,6 +56,7 @@ class Record(BaseModel):
 
 
 class ProjectRead(Record):
+    owner_name: str
     name: str
     description: str
     artist: str

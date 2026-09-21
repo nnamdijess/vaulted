@@ -25,7 +25,20 @@ class Project(Base):
     sharing_enabled: Mapped[bool] = mapped_column(default=False)
     allow_downloads: Mapped[bool] = mapped_column(default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    @property
+    def owner_name(self) -> str:
+        return self.owner.display_name if self.owner else ""
+
     songs: Mapped[list["Song"]] = relationship(back_populates="project", cascade="all, delete-orphan")
+
+
+class Artwork(Base):
+    __tablename__ = "artworks"
+    __table_args__ = (UniqueConstraint("owner_id", "file_path", name="uq_artwork_owner_path"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    file_path: Mapped[str] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
 class Song(Base):

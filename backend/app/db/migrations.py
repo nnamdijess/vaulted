@@ -38,3 +38,8 @@ def upgrade_local_database(engine: Engine) -> None:
                 counters[project_id] = counters.get(project_id, 0) + 1
                 connection.execute(text("UPDATE songs SET position=:position WHERE id=:id"),
                                    {"position": counters[project_id], "id": song_id})
+
+        if inspect(connection).has_table('artworks'):
+            connection.exec_driver_sql("""INSERT OR IGNORE INTO artworks (owner_id, file_path, created_at)
+                SELECT owner_id, cover_path, CURRENT_TIMESTAMP FROM projects
+                WHERE owner_id IS NOT NULL AND cover_path IS NOT NULL""")

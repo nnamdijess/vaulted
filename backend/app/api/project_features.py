@@ -10,7 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 
 from app.api.music import Database, lock_track_order, require_record, audio_response
-from app.models.music import ListenEvent, Project, Song, SongVersion
+from app.models.music import Artwork, ListenEvent, Project, Song, SongVersion
 from app.schemas.music import ProjectRead
 from app.schemas.project_features import ListenCreate, NotesUpdate, ProjectUpdate, ShareUpdate, TrackOrder
 from app.services.artwork import save_cover
@@ -53,7 +53,7 @@ def project_notes(project_id: int, data: NotesUpdate, db: Database):
 @router.delete('/projects/{project_id}', status_code=204)
 def delete_project(project_id: int, db: Database):
     project = require_record(db, Project, project_id)
-    keys = [project.cover_path] + [v.file_path for s in project.songs for v in s.versions]
+    keys = [v.file_path for s in project.songs for v in s.versions]
     db.execute(delete(ListenEvent).where(ListenEvent.project_id == project_id))
     db.delete(project)
     db.commit()
@@ -78,25 +78,22 @@ def order_tracks(project_id: int, data: TrackOrder, db: Database):
 def upload_cover(project_id: int, db: Database, file: Annotated[UploadFile, File()]):
     project = require_record(db, Project, project_id)
     key = save_cover(file)
-    old_key = project.cover_path
     try:
+        db.add(Artwork(owner_id=db.info["owner_id"], file_path=key))
         project.cover_path = key
         db.commit()
     except Exception:
         db.rollback()
         remove_files([key])
         raise
-    remove_files([old_key])
     return project
 
 
 @router.delete('/projects/{project_id}/cover', response_model=ProjectRead)
 def remove_cover(project_id: int, db: Database):
     project = require_record(db, Project, project_id)
-    old_key = project.cover_path
     project.cover_path = None
     db.commit()
-    remove_files([old_key])
     return project
 
 
@@ -153,7 +150,7 @@ def public_project(token: str, db: PublicDatabase):
     project = shared_project(db, token)
     songs = db.scalars(select(Song).options(selectinload(Song.versions)).where(Song.project_id == project.id).order_by(Song.position, Song.id)).all()
     # Explicit allowlist: never serialize owner schemas, notes, file paths or tokens.
-    return {'name': project.name, 'artist': project.artist, 'has_cover': bool(project.cover_path),
+    return {'name': project.name, 'artist': project.artist, 'owner_name': project.owner_name, 'has_cover': bool(project.cover_path),
             'allow_downloads': project.allow_downloads,
             'tracks': [{'id': s.id, 'title': s.title, 'artist': s.artist, 'position': s.position,
                         'playable': s.latest_version_id is not None} for s in songs]}
