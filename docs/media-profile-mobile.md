@@ -149,3 +149,19 @@ npm.cmd run typecheck
 npm.cmd run build
 Remove-Item Env:NEXT_DIST_DIR
 ```
+
+### Firefox player reload regression
+
+Player buttons and the seek input opt out of browser form-state restoration with
+`autocomplete="off"`. Firefox can otherwise restore dynamic disabled states before
+React hydrates, even when the server and initial React state agree. Do not replace
+this with hydration-warning suppression.
+
+The player reload test runs in Chromium by default. To check Firefox specifically:
+
+```powershell
+npx.cmd playwright install firefox
+$env:TEST_BROWSER='firefox'
+npm.cmd run test:e2e -- firefox-hydration
+Remove-Item Env:TEST_BROWSER
+```

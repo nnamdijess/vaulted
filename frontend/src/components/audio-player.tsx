@@ -141,10 +141,11 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
         {current ? <Link href={current.publicToken ? `/share/${current.publicToken}` : `/songs/${current.songId}`}>{current.title}</Link> : <strong>Nothing playing</strong>}
         <small>{current?.artist || (current ? "Vaulted" : "Choose a track to listen")}</small>
       </div></div>
+      {/* Firefox must not restore stale disabled states before React hydrates. */}
       <div className="transport">
-        <button className="icon-button" aria-label="Previous track" disabled={!canPrevious} onClick={() => move(-1)}>⏮</button>
-        <button className="play-button" aria-label={playing ? "Pause playback" : "Resume playback"} disabled={!canPlay} onClick={toggle}>{playing ? "Ⅱ" : "▶"}</button>
-        <button className="icon-button" aria-label="Next track" disabled={!canNext} onClick={() => move(1)}>⏭</button>
+        <button {...{ autoComplete: "off" }} className="icon-button" aria-label="Previous track" disabled={!canPrevious} onClick={() => move(-1)}>⏮</button>
+        <button {...{ autoComplete: "off" }} className="play-button" aria-label={playing ? "Pause playback" : "Resume playback"} disabled={!canPlay} onClick={toggle}>{playing ? "Ⅱ" : "▶"}</button>
+        <button {...{ autoComplete: "off" }} className="icon-button" aria-label="Next track" disabled={!canNext} onClick={() => move(1)}>⏭</button>
       </div>
       <div className="timeline"><span aria-label="Elapsed time">{clock(elapsed)}</span>
         <Waveform key={waveformEndpoint ?? 'empty'} endpoint={waveformEndpoint} elapsed={elapsed} duration={duration} onSeek={time => {
