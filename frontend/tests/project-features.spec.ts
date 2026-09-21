@@ -101,6 +101,7 @@ test('artwork and notes dialogs, shared listening without owner controls, insigh
   await expect.poll(() => friend.getByTestId('global-audio').evaluate((audio: HTMLAudioElement) => audio.currentTime)).toBeGreaterThan(0.15);
   await friend.getByRole('button', { name: 'Pause playback', exact: true }).click();
   expect((await (await request.get(`${api}/projects/${project.id}/insights`)).json()).total).toBe(0);
+  await expect(friend.getByTestId('audio-waveform')).toBeVisible();
   await friend.getByRole('slider', { name: 'Seek audio' }).fill('2.9');
   await friend.getByRole('button', { name: 'Resume playback', exact: true }).click();
   await expect.poll(() => friend.getByTestId('global-audio').evaluate((audio: HTMLAudioElement) => audio.ended)).toBe(true);

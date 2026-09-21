@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  allowedDevOrigins: process.env.DEV_ALLOWED_ORIGINS?.split(',').map(host => host.trim()).filter(Boolean),
   distDir: process.env.NEXT_DIST_DIR || ".next",
   // Rewritten multipart requests otherwise truncate at Next's 10 MiB default.
   // The UI allows 500 MiB of files, leaving room for multipart headers here.

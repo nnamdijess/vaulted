@@ -1,5 +1,6 @@
 "use client";
 
+import { Waveform } from "./waveform";
 import Link from "next/link";
 import { createContext, useContext, useRef, useState } from "react";
 import { apiUrl, Project, projectCoverUrl, Song } from "@/lib/api";
@@ -54,6 +55,7 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
   const canPrevious = Boolean(current && index > 0);
   const canNext = Boolean(current && index < queue.length - 1);
   const insights = usePlaybackInsights();
+  const waveformEndpoint = current ? current.publicToken ? `/api/public/${encodeURIComponent(current.publicToken)}/songs/${current.songId}/waveform` : apiUrl(`/versions/${current.versionId}/waveform`) : null;
 
   function resume() {
     const element = audio.current;
@@ -136,9 +138,8 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
         <button className="icon-button" aria-label="Next track" disabled={!canNext} onClick={() => move(1)}>⏭</button>
       </div>
       <div className="timeline"><span aria-label="Elapsed time">{clock(elapsed)}</span>
-        <input aria-label="Seek audio" type="range" min={0} max={duration || 0} step="0.1" value={Math.min(elapsed, duration)} disabled={!duration} onChange={(event) => {
-          const time = Number(event.target.value);
-          if (audio.current) audio.current.currentTime = time;
+        <Waveform key={waveformEndpoint ?? 'empty'} endpoint={waveformEndpoint} elapsed={elapsed} duration={duration} onSeek={time => {
+          if (audio.current) { audio.current.currentTime = time; insights.resetSample(audio.current); }
           setElapsed(time);
         }} /><span aria-label="Duration">{clock(duration)}</span></div>
       {error && <p role="alert" className="player-error">{error}</p>}

@@ -14,7 +14,7 @@ export function AuthForm({ register = false }: { register?: boolean }) {
       await api(`/auth/${register ? 'register' : 'login'}`, postJson(Object.fromEntries(new FormData(event.currentTarget))));
       const next = new URLSearchParams(window.location.search).get('next');
       // Only known private routes; never follow arbitrary redirect URLs.
-      window.location.assign(next && /^\/(projects|songs)(\/\d+)?$/.test(next) ? next : '/projects');
+      window.location.assign(next && /^\/(projects|songs|profile)(\/\d+)?$/.test(next) ? next : '/projects');
     } catch (err) { setError(err instanceof Error ? err.message : 'Unable to sign in.'); setBusy(false); }
   }
   return <main><header><Link href="/" className="brand">unreleased<span className="dot">.</span></Link><ThemeSwitch /></header>

@@ -1,0 +1,87 @@
+import { expect } from '@playwright/test';
+import { test, wav } from './fixtures';
+
+test('mobile crop save/cancel, profile privacy controls, themes and waveform seeking', async ({ browser, request }, testInfo) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  await context.addCookies((await request.storageState()).cookies);
+  const page = await context.newPage();
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('console', msg => { if (/hydration|did not match/i.test(msg.text())) errors.push(msg.text()); });
+  const project = await (await request.post('http://127.0.0.1:8011/api/projects', { data: { name: 'Mobile album' } })).json();
+  await page.goto(`/projects/${project.id}`);
+  const picture = Buffer.from(await page.evaluate(() => {
+    const canvas = document.createElement('canvas'); canvas.width = 400; canvas.height = 200;
+    const ctx = canvas.getContext('2d')!; ctx.fillStyle = 'red'; ctx.fillRect(0,0,200,200); ctx.fillStyle = 'blue'; ctx.fillRect(200,0,200,200);
+    return canvas.toDataURL('image/png').split(',')[1];
+  }), 'base64');
+  const file = { name: 'wide.png', mimeType: 'image/png', buffer: picture };
+  await page.getByRole('button', { name: 'Change cover for Mobile album' }).tap();
+  await page.getByLabel('Cover image', { exact: true }).setInputFiles(file);
+  await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeEnabled();
+  await page.getByLabel('Zoom', { exact: true }).fill('2');
+  const crop = page.getByLabel('Square crop preview');
+  await crop.scrollIntoViewIfNeeded();
+  const beforeDrag = await crop.evaluate((canvas: HTMLCanvasElement) => canvas.toDataURL());
+  const cropBox = (await crop.boundingBox())!;
+  const cdp = await context.newCDPSession(page);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: cropBox.x + 120, y: cropBox.y + 100 }] });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: cropBox.x + 175, y: cropBox.y + 100 }] });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await expect.poll(() => crop.evaluate((canvas: HTMLCanvasElement) => canvas.toDataURL())).not.toBe(beforeDrag);
+
+  await page.getByLabel('Horizontal position', { exact: true }).fill('1');
+  await cdp.detach();
+  await page.getByRole('button', { name: 'Save', exact: true }).tap();
+  await expect(page.getByAltText('Mobile album cover')).toBeVisible();
+  const original = await (await page.request.get(`/api/projects/${project.id}`)).json();
+  const cropped = await (await page.request.get(`/api/projects/${project.id}/cover`)).body();
+  expect(cropped.readUInt32BE(16)).toBe(1024); expect(cropped.readUInt32BE(20)).toBe(1024);
+  await page.getByRole('button', { name: 'Change cover for Mobile album' }).tap();
+  await page.getByLabel('Cover image', { exact: true }).setInputFiles(file);
+  await page.getByRole('button', { name: 'Cancel', exact: true }).tap();
+  expect((await (await page.request.get(`/api/projects/${project.id}`)).json()).cover_path).toBe(original.cover_path);
+  const uploaded = await (await page.request.post(`/api/projects/${project.id}/tracks`, { multipart: { files: { name: 'Wave.wav', mimeType: 'audio/wav', buffer: wav() } } })).json();
+  await page.reload();
+  await page.getByRole('button', { name: 'Play All' }).tap();
+  await expect(page.getByTestId('audio-waveform')).toBeVisible();
+  await page.getByRole('button', { name: 'Pause playback', exact: true }).tap();
+  const seek = page.getByRole('slider', { name: 'Seek audio' });
+  await seek.fill('1'); await seek.focus(); await page.keyboard.press('ArrowRight');
+  await expect.poll(() => page.getByTestId('global-audio').evaluate((audio: HTMLAudioElement) => audio.currentTime)).toBeGreaterThan(1);
+  const box = await seek.boundingBox();
+  await page.touchscreen.tap(box!.x + box!.width * 0.75, box!.y + box!.height / 2);
+  await expect.poll(() => page.getByTestId('global-audio').evaluate((audio: HTMLAudioElement) => audio.currentTime)).toBeGreaterThan(1.5);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath('mobile-album.png') });
+  await page.getByRole('link', { name: 'Test owner', exact: true }).tap();
+  await expect(page).toHaveURL(/\/profile$/);
+  await page.getByRole('button', { name: 'Change profile picture' }).tap();
+  await page.getByLabel('Profile picture', { exact: true }).setInputFiles(file);
+  await page.getByRole('button', { name: 'Save', exact: true }).tap();
+  await expect(page.getByAltText('Your profile picture')).toBeVisible();
+  await page.getByLabel('Theme', { exact: true }).selectOption('light'); await page.reload();
+  await expect(page.getByLabel('Theme', { exact: true })).toHaveValue('light');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath('mobile-profile.png') });
+  await page.getByRole('button', { name: 'Change profile picture' }).tap();
+  await page.getByRole('button', { name: 'Remove profile picture', exact: true }).tap();
+  await expect(page.getByAltText('Your profile picture')).toHaveCount(0);
+  expect(errors).toEqual([]);
+  expect(uploaded).toHaveLength(1);
+  await context.close();
+});
+
+
+test('waveform failure preserves playback and accessible seeking', async ({ page, request }) => {
+  const project = await (await request.post('http://127.0.0.1:8011/api/projects', { data: { name: 'Fallback' } })).json();
+  await request.post(`http://127.0.0.1:8011/api/projects/${project.id}/tracks`, { multipart: { files: { name: 'Audio.wav', mimeType: 'audio/wav', buffer: wav() } } });
+  await page.route('**/waveform', route => route.fulfill({ status: 422, body: '{}' }));
+  await page.goto(`/projects/${project.id}`);
+  await page.getByRole('button', { name: 'Play All' }).click();
+  await expect(page.getByText('Waveform unavailable — seeking still works')).toBeVisible();
+  const seek = page.getByRole('slider', { name: 'Seek audio' });
+  await expect(seek).toBeEnabled();
+  await seek.fill('1');
+  await expect.poll(() => page.getByTestId('global-audio').evaluate((audio: HTMLAudioElement) => audio.currentTime)).toBeGreaterThanOrEqual(1);
+});

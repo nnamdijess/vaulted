@@ -125,3 +125,39 @@ select { padding: 10px; border: 1px solid var(--border); border-radius: 8px; fon
 .auth-panel form { display: grid; gap: 1.25rem; }
 .auth-panel label { display: grid; gap: .5rem; }
 .account-area { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; margin-bottom: .75rem; font-size: .85rem; }
+/* Shared cropping and compact account surfaces. */
+.crop-preview { display: block; width: min(100%, 300px); height: auto; aspect-ratio: 1; margin: auto; background: var(--field); border: 1px solid var(--border); touch-action: none; cursor: grab; }
+.profile-panel { max-width: 520px; margin: auto; overflow-wrap: anywhere; }
+.profile-picture { width: 112px; height: 112px; object-fit: cover; border-radius: 50%; margin: 20px 0; }
+.avatar-fallback { display: grid; place-items: center; background: var(--control); color: var(--accent); font-size: 40px; }
+.profile-appearance { margin: 32px 0 20px; }
+.profile-link { display: flex; align-items: center; gap: 8px; overflow-wrap: anywhere; }
+.waveform-area { flex: 1; min-width: 0; }
+.waveform { height: 48px; position: relative; display: flex; align-items: center; }
+.waveform svg { width: 100%; height: 48px; display: block; }
+.waveform input { width: 100%; margin: 0; }
+.waveform-ready input { position: absolute; inset: 0; height: 48px; opacity: 0; cursor: pointer; }
+.waveform:focus-within { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+.waveform-status { font-size: 10px; display: block; }
+@media(max-width:700px) {
+  header { align-items: flex-start; flex-wrap: wrap; }
+  .account-area { gap: 8px; }
+  .audio-dock { padding-bottom: max(13px, env(safe-area-inset-bottom)); }
+  main { padding-bottom: 210px; }
+  .row-play, .icon-button { min-height: 44px; min-width: 44px; }
+  .track-row { grid-template-columns: 18px 44px minmax(0,1fr) 44px; gap: 4px; }
+  .modal { padding: 20px; max-height: 90dvh; }
+  .dialog-buttons { flex-wrap: wrap; }
+  .album-header { gap: 16px; }
+  .version-row { grid-template-columns: 44px minmax(0,1fr); }
+  .version-row p { overflow-wrap: anywhere; }
+  .transport { gap: 0; }
+  .timeline { min-width: 0; }
+  .now-playing small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+.account-picture { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+.crop-editor .crop-preview { width: min(100%, 220px); }
+.crop-editor label { margin: 8px 0; gap: 4px; }
+.crop-editor input[type="range"] { padding: 0; height: 24px; }
+.crop-editor + .dialog-buttons { margin-top: 12px; }
+button, a, input[type="range"] { touch-action: manipulation; }

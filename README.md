@@ -205,3 +205,5 @@ No push is performed automatically and force pushes are never required.
 
 Framework references: [Next.js installation](https://nextjs.org/docs/app/getting-started/installation)
 and [FastAPI first steps](https://fastapi.tiangolo.com/tutorial/first-steps/).
+
+See [cropping, profiles, mobile preview and waveforms](docs/media-profile-mobile.md) for the latest controls and exact same-Wi-Fi setup instructions.

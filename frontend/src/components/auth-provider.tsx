@@ -5,8 +5,8 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 
-type User = { id: number; email: string; display_name: string };
-type Auth = { user: User | null; loading: boolean };
+export type User = { id: number; email: string; display_name: string; avatar_path: string | null };
+type Auth = { user: User | null; loading: boolean; setUser: (user: User) => void };
 const Context = createContext<Auth | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -19,7 +19,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, []);
-  return <Context.Provider value={{ user, loading }}>{children}</Context.Provider>;
+  return <Context.Provider value={{ user, loading, setUser }}>{children}</Context.Provider>;
 }
 
 export function useAuth() {
@@ -52,5 +52,12 @@ export function AccountArea() {
       window.location.assign('/login');
     } catch { setError('Could not log out. Please try again.'); setBusy(false); }
   }
-  return <div className="account-area">{user ? <><span>{user.display_name || user.email}</span><button onClick={logout} disabled={busy}>Log out</button></> : <Link href="/login">Log in</Link>}{error && <span role="alert">{error}</span>}</div>;
+  return <div className="account-area">{user ? <><Link href="/profile" className="profile-link" title="Open your profile"><AccountPicture path={user.avatar_path} /><span>{user.display_name || user.email}</span></Link><button onClick={logout} disabled={busy}>Log out</button></> : <Link href="/login">Log in</Link>}{error && <span role="alert">{error}</span>}</div>;
+}
+
+
+function AccountPicture({ path }: { path: string | null }) {
+  if (!path) return null;
+  // eslint-disable-next-line @next/next/no-img-element -- authenticated local avatar
+  return <img className="account-picture" src={`/api/auth/avatar?v=${encodeURIComponent(path)}`} alt="" />;
 }
