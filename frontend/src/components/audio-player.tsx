@@ -2,13 +2,18 @@
 
 import { Waveform } from "./waveform";
 import Link from "next/link";
+import { Modal } from './modal';
+import { PlayerIcon } from './player-icon';
+import { FavoriteButton } from './favorite-button';
+import { useAuth } from './auth-provider';
+import { PlaybackOrder, RepeatMode } from '@/lib/playback-order';
 import { createContext, useContext, useRef, useState } from "react";
 import { apiUrl, Project, projectCoverUrl, Song } from "@/lib/api";
 import { usePlaybackInsights } from "@/lib/playback-insights";
 
-export type QueueTrack = { songId: number; title: string; artist: string; fallbackArtist?: string; versionId: number; publicToken?: string; projectId?: number; coverUrl?: string };
+export type QueueTrack = { songId: number; title: string; artist: string; fallbackArtist?: string; usesOwnerName?: boolean; versionName?: string | null; versionId: number; publicToken?: string; projectId?: number; coverUrl?: string };
 export function trackFor(song: Song, project?: Project | null): QueueTrack | null {
-  return song.latest_version_id ? { songId: song.id, title: song.title, artist: song.artist, fallbackArtist: project?.artist || project?.owner_name || "", versionId: song.latest_version_id, projectId: song.project_id, coverUrl: projectCoverUrl(project) } : null;
+  return song.latest_version_id ? { songId: song.id, title: song.title, artist: song.artist, fallbackArtist: project?.artist || project?.owner_name || "", usesOwnerName: !project?.artist, versionName: song.latest_version_name, versionId: song.latest_version_id, projectId: song.project_id, coverUrl: projectCoverUrl(project) } : null;
 }
 
 type Player = {
@@ -42,9 +47,15 @@ function PlayerArtwork({ src, title }: { src?: string; title: string }) {
 }
 
 export function AudioPlayerProvider({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
   const audio = useRef<HTMLAudioElement>(null);
+  const order = useRef(new PlaybackOrder());
+  const [shuffle, setShuffle] = useState(false);
+  const [repeat, setRepeat] = useState<RepeatMode>('off');
+  const [expanded, setExpanded] = useState(false);
   const queueRef = useRef<QueueTrack[]>([]);
   const indexRef = useRef(0);
+  const playbackRequest = useRef(0);
   const [queue, setQueue] = useState<QueueTrack[]>([]);
   const [index, setIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -53,10 +64,11 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
   const [error, setError] = useState("");
   const current = queue[index] ?? null;
   const canPlay = Boolean(current);
-  const canPrevious = Boolean(current && index > 0);
-  const canNext = Boolean(current && index < queue.length - 1);
+  const canPrevious = Boolean(current && order.current.canPrevious);
+  const canNext = Boolean(current && order.current.canNext);
+  const artist = current ? current.artist || (current.usesOwnerName && !current.publicToken ? user?.display_name : current.fallbackArtist) || "Unknown artist" : "Choose a track to listen";
   const insights = usePlaybackInsights();
-  const waveformEndpoint = current ? current.publicToken ? `/api/public/${encodeURIComponent(current.publicToken)}/songs/${current.songId}/waveform` : apiUrl(`/versions/${current.versionId}/waveform`) : null;
+  const waveformEndpoint = current ? current.publicToken ? `/api/public/${encodeURIComponent(current.publicToken)}/songs/${current.songId}/waveform?version_id=${current.versionId}` : apiUrl(`/versions/${current.versionId}/waveform`) : null;
 
   function resume() {
     const element = audio.current;
@@ -66,7 +78,7 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
       if (err.name !== "AbortError") setError("Playback could not start. Press play to retry or choose another track.");
     });
   }
-  function playQueue(tracks: QueueTrack[], start = 0, autoPlay = true) {
+  function loadTrack(tracks: QueueTrack[], start = 0, autoPlay = true) {
     if (!tracks[start] || !audio.current) return;
     queueRef.current = tracks;
     indexRef.current = start;
@@ -74,18 +86,27 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
     const track = tracks[start];
     const publicBase = track.publicToken ? `/api/public/${encodeURIComponent(track.publicToken)}/songs/${track.songId}` : null;
     insights.begin(publicBase ? `${publicBase}/listens` : apiUrl(`/songs/${track.songId}/listens`));
-    audio.current.src = publicBase ? `${publicBase}/audio` : apiUrl(`/versions/${track.versionId}/audio`);
+    // A fresh URL prevents the media element reusing a revoked buffered response on replay.
+    const source = publicBase ? `${publicBase}/audio?version_id=${track.versionId}` : apiUrl(`/versions/${track.versionId}/audio?play=1`);
+    audio.current.src = `${source}&playback=${++playbackRequest.current}`;
     if (autoPlay) resume();
     else audio.current.load();
   }
+  function playQueue(tracks: QueueTrack[], start = 0, autoPlay = true) {
+    if (!tracks[start]) return;
+    order.current.reset(tracks.map(track => track.songId), tracks[start].songId);
+    loadTrack(tracks, start, autoPlay);
+  }
   function toggle() {
     if (!audio.current || !queueRef.current.length) return;
-    if (audio.current.paused) resume();
+    if (audio.current.ended) loadTrack(queueRef.current, indexRef.current);
+    else if (audio.current.paused) resume();
     else audio.current.pause();
   }
   function move(offset: number) {
-    const next = indexRef.current + offset;
-    if (queueRef.current[next]) playQueue(queueRef.current, next);
+    const id = offset < 0 ? order.current.previous() : order.current.next();
+    const next = queueRef.current.findIndex(track => track.songId === id);
+    if (next >= 0) loadTrack(queueRef.current, next);
   }
   function updateSong(song: Song) {
     queueRef.current = queueRef.current.map((track) => track.songId === song.id ? { ...track, title: song.title, artist: song.artist } : track);
@@ -93,7 +114,7 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
   }
   function updateProject(project: Project) {
     queueRef.current = queueRef.current.map((track) => track.projectId === project.id && !track.publicToken
-      ? { ...track, coverUrl: projectCoverUrl(project), fallbackArtist: project.artist || project.owner_name } : track);
+      ? { ...track, coverUrl: projectCoverUrl(project), fallbackArtist: project.artist || project.owner_name, usesOwnerName: !project.artist } : track);
     setQueue(queueRef.current);
   }
   function reorderProject(projectId: number, songIds: number[]) {
@@ -102,6 +123,7 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
     const positions = new Map(songIds.map((id, index) => [id, index]));
     queueRef.current = [...queueRef.current].sort((a,b) => (positions.get(a.songId) ?? Infinity) - (positions.get(b.songId) ?? Infinity));
     indexRef.current = Math.max(0, queueRef.current.indexOf(selected));
+    order.current.reconcile(queueRef.current.map(track => track.songId));
     setQueue(queueRef.current); setIndex(indexRef.current);
   }
   function removeSong(songId: number) {
@@ -116,12 +138,14 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
       audio.current?.pause();
       if (remaining.length) playQueue(remaining, Math.min(indexRef.current, remaining.length - 1), wasPlaying);
       else {
+        order.current = new PlaybackOrder(); order.current.shuffle = shuffle; order.current.repeat = repeat;
         queueRef.current = []; indexRef.current = 0; setIndex(0); setQueue([]); setElapsed(0); setDuration(0); setError(''); setPlaying(false);
         audio.current?.removeAttribute("src"); audio.current?.load();
       }
     } else {
       queueRef.current = remaining;
       indexRef.current = Math.max(0, remaining.findIndex((track) => track === oldCurrent));
+      order.current.reconcile(remaining.map(track => track.songId));
       setQueue(remaining); setIndex(indexRef.current);
     }
   }
@@ -135,24 +159,46 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
         onSeeked={() => { if (audio.current) insights.resetSample(audio.current); }}
         onTimeUpdate={() => { setElapsed(audio.current?.currentTime ?? 0); if (audio.current) insights.tick(audio.current); }}
         onDurationChange={() => setDuration(Number.isFinite(audio.current?.duration) ? audio.current!.duration : 0)}
-        onEnded={() => { setPlaying(false); move(1); }}
+        onEnded={() => { setPlaying(false); if (order.current.repeat === "one") loadTrack(queueRef.current, indexRef.current); else move(1); }}
         onError={() => { setPlaying(false); setError("Unable to play this file. Check the backend and browser codec support."); }} />
-      <div className="now-playing"><PlayerArtwork key={current?.coverUrl ?? 'placeholder'} src={current?.coverUrl} title={current?.title ?? 'current track'} /><div>
-        {current ? <Link href={current.publicToken ? `/share/${current.publicToken}` : `/songs/${current.songId}`}>{current.title}</Link> : <strong>Nothing playing</strong>}
-        <small>{current ? current.artist || current.fallbackArtist || "Unknown artist" : "Choose a track to listen"}</small>
+      <div className="now-playing"><button className="artwork-trigger" aria-label="Open Now Playing" disabled={!canPlay} onClick={() => setExpanded(true)}><PlayerArtwork key={current?.coverUrl ?? 'placeholder'} src={current?.coverUrl} title={current?.title ?? 'current track'} /></button><div>
+        {current ? <button className="track-view-trigger" onClick={() => setExpanded(true)} aria-label={`Now Playing: ${current.title}`}>{current.title}</button> : <strong>Nothing playing</strong>}
+        <small>{artist}</small>
       </div></div>
-      {/* Firefox must not restore stale disabled states before React hydrates. */}
-      <div className="transport">
-        <button {...{ autoComplete: "off" }} className="icon-button" aria-label="Previous track" disabled={!canPrevious} onClick={() => move(-1)}>⏮</button>
-        <button {...{ autoComplete: "off" }} className="play-button" aria-label={playing ? "Pause playback" : "Resume playback"} disabled={!canPlay} onClick={toggle}>{playing ? "Ⅱ" : "▶"}</button>
-        <button {...{ autoComplete: "off" }} className="icon-button" aria-label="Next track" disabled={!canNext} onClick={() => move(1)}>⏭</button>
-      </div>
-      <div className="timeline"><span aria-label="Elapsed time">{clock(elapsed)}</span>
-        <Waveform key={waveformEndpoint ?? 'empty'} endpoint={waveformEndpoint} elapsed={elapsed} duration={duration} onSeek={time => {
-          if (audio.current) { audio.current.currentTime = time; insights.resetSample(audio.current); }
-          setElapsed(time);
-        }} /><span aria-label="Duration">{clock(duration)}</span></div>
+      {transport()}
+      {timeline()}
       {error && <p role="alert" className="player-error">{error}</p>}
     </aside>
+    {expanded && current && <Modal title="Now Playing" className="now-playing-dialog" onClose={() => setExpanded(false)}>
+      <div className="expanded-artwork"><PlayerArtwork key={current.coverUrl ?? 'placeholder'} src={current.coverUrl} title={current.title} /></div>
+      <div className="expanded-track-heading"><div><h2>{current.title}</h2><p>{artist}</p>{current.versionName && <small className="muted">{current.versionName}</small>}</div>
+        {!current.publicToken && user && <FavoriteButton key={current.songId} songId={current.songId} />}</div>
+      {timeline()}
+      <div className="expanded-controls">
+        <button className="icon-button mode-button" aria-label="Shuffle" aria-pressed={shuffle} onClick={() => { order.current.setShuffle(!shuffle); setShuffle(!shuffle); }}><PlayerIcon name="shuffle" /></button>
+        {transport()}
+        <button className="icon-button mode-button" aria-label={`Repeat: ${repeat}`} aria-pressed={repeat !== 'off'} onClick={() => {
+          const next: RepeatMode = repeat === 'off' ? 'all' : repeat === 'all' ? 'one' : 'off'; order.current.repeat = next; setRepeat(next);
+        }}><PlayerIcon name="repeat" />{repeat === 'one' && <span className="repeat-one">1</span>}</button>
+      </div>
+      <p className="playback-mode-status" role="status">Shuffle {shuffle ? 'on' : 'off'} · Repeat {repeat === 'one' ? 'one track' : repeat === 'all' ? 'queue' : 'off'}</p>
+      {error && <p role="alert" className="error">{error}</p>}
+      {!current.publicToken && <Link className="song-details-link" href={`/songs/${current.songId}`} onClick={() => setExpanded(false)}>View song details</Link>}
+    </Modal>}
   </Context.Provider>;
+
+  function transport() {
+    return <div className="transport">
+      <button {...{ autoComplete: "off" }} className="icon-button" aria-label="Previous track" disabled={!canPrevious} onClick={() => move(-1)}><PlayerIcon name="previous" /></button>
+      <button {...{ autoComplete: "off" }} className="play-button" aria-label={playing ? "Pause playback" : "Resume playback"} disabled={!canPlay} onClick={toggle}><PlayerIcon name={playing ? 'pause' : 'play'} /></button>
+      <button {...{ autoComplete: "off" }} className="icon-button" aria-label="Next track" disabled={!canNext} onClick={() => move(1)}><PlayerIcon name="next" /></button>
+    </div>;
+  }
+  function timeline() {
+    return <div className="timeline"><span aria-label="Elapsed time">{clock(elapsed)}</span>
+      <Waveform key={waveformEndpoint ?? 'empty'} endpoint={waveformEndpoint} elapsed={elapsed} duration={duration} onSeek={time => {
+        if (audio.current) { audio.current.currentTime = time; insights.resetSample(audio.current); }
+        setElapsed(time);
+      }} /><span aria-label="Duration">{clock(duration)}</span></div>;
+  }
 }

@@ -24,7 +24,7 @@ test('saved artwork reuse, private search, profile-only controls and artist subt
   await expect(results).toContainText('Test owner');
   await results.getByRole('button', { name: 'Play Midnight' }).click();
   await expect(page.locator('.now-playing small')).toHaveText('Test owner');
-  await expect(page.getByTestId('global-audio')).toHaveAttribute('src', `/api/versions/${song.latest_version_id}/audio`);
+  await expect(page.getByTestId('global-audio')).toHaveAttribute('src', new RegExp(`/api/versions/${song.latest_version_id}/audio\\?`));
   await results.getByRole('link', { name: 'Midnight', exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/songs/${song.id}$`));
   await page.goto('/projects');

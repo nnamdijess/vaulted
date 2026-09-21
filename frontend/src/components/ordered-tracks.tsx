@@ -1,5 +1,6 @@
 "use client";
 import { ReactNode, useRef, useState } from 'react';
+import { PlayerIcon } from "./player-icon";
 import { Song } from '@/lib/api';
 
 export function OrderedTracks({ songs, currentId, onReorder, children }: {
@@ -35,7 +36,7 @@ export function OrderedTracks({ songs, currentId, onReorder, children }: {
   }
   return <><p className="muted reorder-help">Drag the track numbers to reorder. Keyboard: Space to pick up, arrows to move, Enter to save.</p>
     <p className="sr-only" role="status" aria-live="polite">{announcement}</p>
-    <ol className="track-list" aria-label="Project tracks" aria-busy={saving}
+    <ol className={`track-list ${activeId !== null ? "is-reordering" : ""}`} aria-label="Project tracks" aria-busy={saving}
         onPointerMove={event => {
           const state = drag.current; if (!state || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
           const target = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>('[data-track-id]');
@@ -43,16 +44,18 @@ export function OrderedTracks({ songs, currentId, onReorder, children }: {
           if (event.clientY < 90) window.scrollBy(0,-18);
           else if (event.clientY > window.innerHeight - 140) window.scrollBy(0,18);
         }}
-        onPointerUp={event => { if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId); void finish(); }}
+        onPointerUp={event => { void finish(); if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId); }}
+        onLostPointerCapture={() => { if (drag.current) void finish(true); }}
         onPointerCancel={() => void finish(true)}
 >{(preview ?? songs).map((song, index) => <li key={song.id} data-track-id={song.id} className={`track-row ${currentId === song.id ? 'is-current' : ''} ${activeId === song.id ? 'is-dragging' : ''}`}>
       <button className="track-number drag-handle" aria-label={`Reorder ${song.title}`} aria-pressed={activeId === song.id} disabled={saving || songs.length < 2}
-        onPointerDown={event => { if (event.button !== 0) return; start(song.id); event.currentTarget.closest('ol')!.setPointerCapture(event.pointerId); }}
+        onContextMenu={event => event.preventDefault()}
+        onPointerDown={event => { if (event.button !== 0 || saving) return; event.preventDefault(); event.currentTarget.focus({ preventScroll: true }); start(song.id); event.currentTarget.closest('ol')!.setPointerCapture(event.pointerId); }}
         onKeyDown={event => {
           if (event.key === ' ' || event.key === 'Enter') { event.preventDefault(); if (drag.current) void finish(); else start(song.id); }
           else if (event.key === 'Escape') { event.preventDefault(); void finish(true); }
           else if (drag.current && ['ArrowUp','ArrowDown'].includes(event.key)) { event.preventDefault(); move(drag.current.order.findIndex(item => item.id === song.id) + (event.key === 'ArrowUp' ? -1 : 1)); }
-        }}><span>{index + 1}</span><span className="grip" aria-hidden="true">⠿</span></button>
+        }}><span>{index + 1}</span><span className="grip" aria-hidden="true"><PlayerIcon name="grip" /></span></button>
       {children(song)}
     </li>)}</ol></>;
 }

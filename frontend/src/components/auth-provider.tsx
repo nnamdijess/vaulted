@@ -7,12 +7,13 @@ import { usePathname, useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 
 export type User = { id: number; email: string; display_name: string; avatar_path: string | null; library_name: string; accent_color: 'green' | 'blue' | 'purple' | 'pink' | 'orange' | 'teal' };
-type Auth = { user: User | null; loading: boolean; setUser: (user: User) => void };
+type Auth = { user: User | null; loading: boolean; setUser: (user: User) => void; setAccentPreview: (color: User["accent_color"] | null) => void };
 const Context = createContext<Auth | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [accentPreview, setAccentPreview] = useState<User["accent_color"] | null>(null);
   useEffect(() => {
     let active = true;
     void api<User>('/auth/me').then((account) => { if (active) setUser(account); })
@@ -20,7 +21,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, []);
-  return <Context.Provider value={{ user, loading, setUser }}><div className="account-scope" data-accent={user?.accent_color ?? "green"}>{children}</div></Context.Provider>;
+  return <Context.Provider value={{ user, loading, setUser, setAccentPreview }}><div className="account-scope" data-accent={accentPreview ?? user?.accent_color ?? "green"}>{children}</div></Context.Provider>;
 }
 
 export function useAuth() {

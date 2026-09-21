@@ -223,3 +223,8 @@ Enter to save, Escape to cancel. This replaces the Sort tracks dialog.
 The persistent player now uses a compact floating dock and shorter real-audio
 waveform with a playhead. On phones, elapsed/duration text is visually hidden to
 leave room for track information, playback controls and seeking in one row.
+
+Tap the playing artwork/title for the expanded **Now Playing** view with favorites,
+shuffle, repeat, and waveform seeking. Profile now supports display-name editing
+and live accent previews with Save/Revert. See [Now Playing and profile updates](docs/now-playing.md)
+for playback rules, API additions, and phone testing instructions.

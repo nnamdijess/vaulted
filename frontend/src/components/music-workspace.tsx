@@ -1,4 +1,5 @@
 "use client";
+import { PlayerIcon } from "./player-icon";
 
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
@@ -104,8 +105,8 @@ function WorkspaceContent({ projectId, songId }: { projectId?: string; songId?: 
       <div className="version-list">{versions.map((version) => <article className="version-row" key={version.id}>
         <button className="row-play" aria-label={`Play ${version.version_name}`} onClick={() => {
           if (player.current?.versionId === version.id) player.toggle();
-          else player.playQueue([{ songId: song.id, title: song.title, artist: song.artist, fallbackArtist: project?.artist || project?.owner_name || "", versionId: version.id, projectId: song.project_id, coverUrl: projectCoverUrl(project) }]);
-        }}>{player.current?.versionId === version.id && player.playing ? "Ⅱ" : "▶"}</button>
+          else player.playQueue([{ songId: song.id, title: song.title, artist: song.artist, fallbackArtist: project?.artist || project?.owner_name || "", usesOwnerName: !project?.artist, versionName: version.version_name, versionId: version.id, projectId: song.project_id, coverUrl: projectCoverUrl(project) }]);
+        }}><PlayerIcon name={player.current?.versionId === version.id && player.playing ? "pause" : "play"} /></button>
         <div><h3>{version.version_name}</h3><p className="muted">{version.original_filename} · {new Date(version.created_at).toLocaleDateString()}</p>{version.notes && <p className="notes">{version.notes}</p>}</div>
       </article>)}</div>
       {!versions.length && <p className="empty">This track has no audio yet. Use its menu to upload a version.</p>}
@@ -114,7 +115,7 @@ function WorkspaceContent({ projectId, songId }: { projectId?: string; songId?: 
         <ProjectCover project={project} onClick={() => setProjectAction("Change cover")} />
         <div><div className="project-heading"><p className="eyebrow">PROJECT</p><ProjectActions project={project} songs={songs} action={projectAction} setAction={setProjectAction} onChange={(updated) => { setProject(updated); player.updateProject(updated); }} /></div><h1>{project.name}</h1><p className="album-subtitle">{project.artist || libraryName} <span>· {songs.length} {songs.length === 1 ? "track" : "tracks"}</span></p>
           {project.description && <p className="description">{project.description}</p>}
-          <div className="album-buttons"><button disabled={!queue.length} onClick={() => player.playQueue(queue)}>▶ Play All</button><button className="secondary" onClick={() => openDialog("tracks")}>＋ Add Tracks</button></div>
+          <div className="album-buttons"><button disabled={!queue.length} onClick={() => player.playQueue(queue)}><PlayerIcon name="play" /> Play All</button><button className="secondary" onClick={() => openDialog("tracks")}>＋ Add Tracks</button></div>
         </div>
       </section>
       <OrderedTracks songs={songs} currentId={player.current?.songId} onReorder={async ordered => {
@@ -124,7 +125,7 @@ function WorkspaceContent({ projectId, songId }: { projectId?: string; songId?: 
           setSongs(updated); player.reorderProject(Number(projectId), updated.map(item => item.id));
         } catch (err) { setError(err instanceof Error ? err.message : 'Could not save track order'); setRevision(value => value + 1); throw err; }
       }}>{item => <>
-        <button className="row-play" aria-label={`${player.current?.songId === item.id && player.playing ? "Pause" : "Play"} ${item.title}`} disabled={!item.latest_version_id} onClick={() => playSong(item)}>{player.current?.songId === item.id && player.playing ? "Ⅱ" : "▶"}</button>
+        <button className="row-play" aria-label={`${player.current?.songId === item.id && player.playing ? "Pause" : "Play"} ${item.title}`} disabled={!item.latest_version_id} onClick={() => playSong(item)}><PlayerIcon name={player.current?.songId === item.id && player.playing ? "pause" : "play"} /></button>
         <div className="track-title"><Link href={`/songs/${item.id}`}>{item.title}</Link><time dateTime={item.created_at}>Uploaded {new Date(item.created_at).toLocaleDateString()}</time></div>
         <SongActions song={item} onChange={onChange} onDelete={onDelete} />
       </>}</OrderedTracks>
