@@ -121,6 +121,9 @@ def update_song(song_id: int, data: SongUpdate, db: Database):
 @router.delete("/songs/{song_id}", status_code=204, tags=["songs"])
 def delete_song(song_id: int, db: Database):
     song = require_record(db, Song, song_id)
+    from app.models.studio import ContentProject
+    if db.scalar(select(ContentProject.id).where(ContentProject.song_id == song_id).limit(1)):
+        raise HTTPException(409, 'Delete the Studio drafts using this song first')
     paths = [audio_path(version.file_path) for version in song.versions]
     db.execute(delete(ListenEvent).where(ListenEvent.song_id == song_id))
     db.delete(song)

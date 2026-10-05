@@ -11,6 +11,7 @@ from app.db.session import Base, engine
 from app.db.migrations import upgrade_local_database
 from app.api.project_features import router as project_router, public_router
 from app.api.auth import router as auth_router
+from app.api.studio import router as studio_router
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from collections import OrderedDict
@@ -41,6 +42,7 @@ app.include_router(music_router, prefix="/api")
 app.include_router(project_router, prefix="/api")
 app.include_router(public_router, prefix="/api")
 app.include_router(auth_router, prefix="/api")
+app.include_router(studio_router, prefix="/api")
 
 
 @app.middleware("http")

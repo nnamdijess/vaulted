@@ -53,6 +53,9 @@ def project_notes(project_id: int, data: NotesUpdate, db: Database):
 @router.delete('/projects/{project_id}', status_code=204)
 def delete_project(project_id: int, db: Database):
     project = require_record(db, Project, project_id)
+    from app.models.studio import ContentProject
+    if db.scalar(select(ContentProject.id).join(Song, ContentProject.song_id == Song.id).where(Song.project_id == project_id).limit(1)):
+        raise HTTPException(409, 'Delete the Studio drafts using this project first')
     keys = [v.file_path for s in project.songs for v in s.versions]
     db.execute(delete(ListenEvent).where(ListenEvent.project_id == project_id))
     db.delete(project)
