@@ -228,3 +228,6 @@ Tap the playing artwork/title for the expanded **Now Playing** view with favorit
 shuffle, repeat, and waveform seeking. Profile now supports display-name editing
 and live accent previews with Save/Revert. See [Now Playing and profile updates](docs/now-playing.md)
 for playback rules, API additions, and phone testing instructions.
+# Studio
+
+Vaulted now includes a separate private lyric-video workspace at `/studio`. See [Studio setup and workflow](docs/studio.md) for Pixabay configuration, FFmpeg requirements, the render worker, storage, APIs and testing.

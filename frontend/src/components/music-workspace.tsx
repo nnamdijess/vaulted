@@ -1,5 +1,6 @@
 "use client";
 import { PlayerIcon } from "./player-icon";
+import { WorkspaceNav } from './workspace-nav';
 
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
@@ -94,6 +95,7 @@ function WorkspaceContent({ projectId, songId }: { projectId?: string; songId?: 
 
   return <main>
     <header><Link href="/" className="brand">vaulted<span className="dot">.</span></Link><AccountArea /></header>
+    <WorkspaceNav />
     <nav aria-label="Breadcrumb"><Link href="/projects">{libraryName}</Link>{project && <> / <Link href={`/projects/${project.id}`}>{project.name}</Link></>}{song && <> / <span>{song.title}</span></>}</nav>
     {error && <div className="error" role="alert">{error} <button onClick={() => { setError(""); setLoading(true); setRevision((value) => value + 1); }}>Retry</button></div>}
     {notice && <p className="notice" role="status">{notice}</p>}

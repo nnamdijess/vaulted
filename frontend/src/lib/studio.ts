@@ -1,0 +1,5 @@
+export type Media = { id: number; provider_id: string; favorite: boolean; preview_url: string; video_url: string; source_url: string; tags: string; duration: number; width: number; height: number };
+export type StudioSong = { id: number; title: string; artist: string; project_id: number; project_name: string; cover_path: string | null; versions: { id: number; name: string }[] };
+export type RenderJob = { id: number; status: string; progress: number; error: string | null; revision: number };
+export type ContentProject = { id: number; title: string; song_id: number; song_version_id: number; song_title: string; artist: string; project_id: number; cover_path: string | null; version_name: string; status: string; start_time: number; end_time: number; lyrics_text: string; aesthetic: string; lyric_style: string; revision: number; lines: { text: string; start_time: number | null; end_time: number | null }[]; clips: { id: number; media_id: number; start_time: number; end_time: number; source_start: number; media: Media }[]; jobs: RenderJob[] };
+export type Presets = { aesthetics: { id: string; name: string }[]; styles: { id: string; name: string }[] };

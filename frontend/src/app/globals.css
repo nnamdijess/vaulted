@@ -284,3 +284,6 @@ button, a, input[type="range"] { touch-action: manipulation; }
   .artwork-trigger { min-width: 44px; display: flex; align-items: center; justify-content: center; }
 }
 @media(max-width:360px) { .audio-dock { grid-template-columns: minmax(58px,1fr) auto minmax(60px,.9fr); padding-inline: 6px; gap: 3px; } }
+.workspace-nav { display: flex; gap: 24px; margin: 20px 0; }
+.workspace-nav a { padding: 10px 0; }
+.workspace-nav a[aria-current="page"] { color: var(--accent); border-bottom: 2px solid currentColor; }

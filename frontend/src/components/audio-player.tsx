@@ -2,6 +2,7 @@
 
 import { Waveform } from "./waveform";
 import Link from "next/link";
+import { usePathname } from 'next/navigation';
 import { Modal } from "./modal";
 import { PlayerIcon } from "./player-icon";
 import { FavoriteButton } from "./favorite-button";
@@ -10,7 +11,7 @@ import { PlaybackOrder, RepeatMode } from "@/lib/playback-order";
 import {
   createContext,
   useContext,
-  useEffect,
+  useSyncExternalStore,
   useRef,
   useState,
 } from "react";
@@ -50,6 +51,12 @@ export function trackFor(
 }
 
 type Player = {
+  elapsed: number;
+  previewError: string;
+  beginStudio: (versionId: number, start: number, end: number) => void;
+  stopStudio: () => void;
+  pause: () => void;
+  seek: (time: number) => void;
   current: QueueTrack | null;
   playing: boolean;
   playQueue: (tracks: QueueTrack[], index?: number) => void;
@@ -62,6 +69,7 @@ type Player = {
 };
 
 const Context = createContext<Player | null>(null);
+const subscribeMounted = () => () => {};
 
 export function usePlayer() {
   const player = useContext(Context);
@@ -110,8 +118,11 @@ export function AudioPlayerProvider({
   children: React.ReactNode;
 }) {
   const { user } = useAuth();
+  const pathname = usePathname();
 
   const audio = useRef<HTMLAudioElement>(null);
+  const studio = useRef<{ start: number; end: number; previousSource: string; previousTime: number } | null>(null);
+  const [studioActive, setStudioActive] = useState(false);
   const order = useRef(new PlaybackOrder());
 
   const [shuffle, setShuffle] = useState(false);
@@ -129,7 +140,7 @@ export function AudioPlayerProvider({
   const [duration, setDuration] = useState(0);
   const [error, setError] = useState("");
 
-  const [mounted, setMounted] = useState(false);
+  const mounted = useSyncExternalStore(subscribeMounted, () => true, () => false);
 
   const current = queue[index] ?? null;
 
@@ -155,10 +166,6 @@ export function AudioPlayerProvider({
       : apiUrl(`/versions/${current.versionId}/waveform`)
     : null;
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
   function resume() {
     const element = audio.current;
 
@@ -173,6 +180,37 @@ export function AudioPlayerProvider({
         );
       }
     });
+  }
+
+  function beginStudio(versionId: number, start: number, end: number) {
+    const element = audio.current;
+    if (!element) return;
+    const previous = studio.current;
+    studio.current = { start, end, previousSource: previous?.previousSource ?? element.src, previousTime: previous?.previousTime ?? element.currentTime };
+    element.pause();
+    setExpanded(false);
+    setStudioActive(true);
+    element.src = apiUrl(`/versions/${versionId}/audio`);
+    element.currentTime = start;
+    setElapsed(start);
+    resume();
+  }
+
+  function stopStudio() {
+    const element = audio.current;
+    const preview = studio.current;
+    if (!element || !preview) return;
+    element.pause();
+    studio.current = null;
+    setStudioActive(false);
+    if (preview.previousSource) {
+      element.src = preview.previousSource;
+      element.currentTime = preview.previousTime;
+    } else {
+      element.removeAttribute('src');
+      element.load();
+    }
+    setElapsed(preview.previousTime);
   }
 
   function loadTrack(
@@ -224,6 +262,7 @@ export function AudioPlayerProvider({
     autoPlay = true
   ) {
     if (!tracks[start]) return;
+    stopStudio();
 
     order.current.reset(
       tracks.map((track) => track.songId),
@@ -405,6 +444,12 @@ export function AudioPlayerProvider({
     <Context.Provider
       value={{
         current,
+        elapsed,
+        previewError: error,
+        beginStudio,
+        stopStudio,
+        pause: () => audio.current?.pause(),
+        seek: (time) => { if (audio.current) audio.current.currentTime = time; },
         playing,
         playQueue,
         toggle,
@@ -418,6 +463,7 @@ export function AudioPlayerProvider({
       {children}
 
       <aside
+        style={studioActive || /^\/studio\/\d+$/.test(pathname) ? { display: 'none' } : undefined}
         className="audio-dock"
         aria-label="Audio player"
       >
@@ -448,8 +494,12 @@ export function AudioPlayerProvider({
               audio.current?.currentTime ?? 0
             );
 
-            if (audio.current) {
+            if (audio.current && !studio.current) {
               insights.tick(audio.current);
+            }
+            if (audio.current && studio.current && audio.current.currentTime >= studio.current.end) {
+              audio.current.pause();
+              audio.current.currentTime = studio.current.end;
             }
           }}
           onDurationChange={() =>
@@ -461,6 +511,7 @@ export function AudioPlayerProvider({
           }
           onEnded={() => {
             setPlaying(false);
+            if (studio.current) return;
 
             if (order.current.repeat === "one") {
               loadTrack(
