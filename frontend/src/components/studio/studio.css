@@ -51,4 +51,17 @@
 .studio-draft-preview.lyric-large p { font-size: 24px; }
 .studio-draft-preview.lyric-lower p { top: auto; bottom: 18%; }
 .studio-draft-preview.lyric-highlight p { color: #ffff80; }
+.studio-timeline-editor { min-width: 0; }
+.studio-timeline-editor .studio-draft-preview { width: min(100%, 300px); max-height: 55svh; border-radius: 14px; }
+.studio-timeline-editor .studio-draft-preview p { pointer-events: none; }
+.studio-timeline-scroll { overflow-x: auto; padding: 4px 3px 12px; }
+.studio-timeline-track { display: flex; gap: 6px; min-width: 100%; width: max-content; }
+.studio-timeline-segment { position: relative; display: grid; gap: 8px; align-content: end; flex-basis: 110px; min-width: 110px; max-width: 220px; min-height: 96px; border: 2px solid var(--line); border-radius: 10px; padding: 10px; overflow: hidden; }
+.studio-timeline-segment[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.studio-timeline-thumb { position: absolute; inset: 0; background-size: cover; background-position: center; opacity: .3; }
+.studio-timeline-segment strong, .studio-timeline-segment small { position: relative; background: var(--background); color: var(--text); border-radius: 4px; padding: 2px; white-space: nowrap; }
+.studio-selected-section { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; margin: 16px 0; }
+.studio-selected-section > div { flex: 1 1 220px; min-width: 0; }
+.studio-selected-section p { overflow-wrap: anywhere; color: var(--muted); margin: 8px 0; }
+.studio-video-error { position: absolute; inset: 0; padding: 24px; display: grid; align-content: center; gap: 16px; background: var(--background); }
 @media (max-width: 500px) { .studio-panel { padding: 16px; } .studio-media-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } .studio-media-grid article { padding: 8px; } .studio-media-grid button { width: 100%; padding: 8px; } .studio-fields { gap: 10px; } .studio-heading { gap: 16px; } .studio-heading h1 { font-size: 28px; overflow-wrap: anywhere; } }
