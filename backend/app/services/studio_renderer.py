@@ -57,7 +57,7 @@ def render(job_id, snapshot, update_progress):
             if not stock.is_file():
                 download_video(media['video_url'], stock)
             filename = f'clip-{index}.mp4'
-            treatment = ',hue=s=0' if snapshot['aesthetic'] == 'black-white' else ''
+            treatment = ',hue=s=0' if snapshot.get('render_aesthetic', snapshot['aesthetic']) == 'black-white' else ''
             command(['-protocol_whitelist', 'file,pipe', '-ss', str(clip['source_start']), '-f', 'mov', '-i', str(stock),
                      '-t', str(clip['end_time'] - clip['start_time']), '-an',
                      '-vf', f'scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,fps=30{treatment}',

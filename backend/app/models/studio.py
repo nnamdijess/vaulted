@@ -47,6 +47,16 @@ class ContentMedia(Base):
     favorite: Mapped[bool] = mapped_column(default=False)
 
 
+class AestheticCollection(Base):
+    __tablename__ = 'aesthetic_collections'
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey('users.id'), index=True)
+    name: Mapped[str] = mapped_column(String(100))
+    base_aesthetic: Mapped[str] = mapped_column(String(40))
+    keywords: Mapped[list] = mapped_column(JSON)
+    media_ids: Mapped[list] = mapped_column(JSON, default=list)
+
+
 class ContentClip(Base):
     __tablename__ = 'content_clips'
     id: Mapped[int] = mapped_column(primary_key=True)

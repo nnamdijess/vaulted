@@ -121,6 +121,7 @@ export function AudioPlayerProvider({
   const pathname = usePathname();
 
   const audio = useRef<HTMLAudioElement>(null);
+  const studioPendingSeek = useRef<number | null>(null);
   const studio = useRef<{ start: number; end: number; previousSource: string; previousTime: number } | null>(null);
   const [studioActive, setStudioActive] = useState(false);
   const order = useRef(new PlaybackOrder());
@@ -190,8 +191,15 @@ export function AudioPlayerProvider({
     element.pause();
     setExpanded(false);
     setStudioActive(true);
-    element.src = apiUrl(`/versions/${versionId}/audio`);
-    element.currentTime = start;
+    const source = apiUrl(`/versions/${versionId}/audio`);
+    if (element.getAttribute('src') !== source) element.src = source;
+    if (element.readyState >= 1) {
+      element.currentTime = start;
+      studioPendingSeek.current = null;
+    } else {
+      // Some browsers cannot apply a nonzero seek before metadata is available.
+      studioPendingSeek.current = start;
+    }
     setElapsed(start);
     resume();
   }
@@ -201,6 +209,7 @@ export function AudioPlayerProvider({
     const preview = studio.current;
     if (!element || !preview) return;
     element.pause();
+    studioPendingSeek.current = null;
     studio.current = null;
     setStudioActive(false);
     if (preview.previousSource) {
@@ -471,6 +480,13 @@ export function AudioPlayerProvider({
           ref={audio}
           data-testid="global-audio"
           preload="metadata"
+          onLoadedMetadata={() => {
+            if (audio.current && studioPendingSeek.current !== null) {
+              audio.current.currentTime = studioPendingSeek.current;
+              setElapsed(studioPendingSeek.current);
+              studioPendingSeek.current = null;
+            }
+          }}
           onPlay={() => {
             setPlaying(true);
 
@@ -490,6 +506,7 @@ export function AudioPlayerProvider({
             }
           }}
           onTimeUpdate={() => {
+            if (studioPendingSeek.current !== null) return;
             setElapsed(
               audio.current?.currentTime ?? 0
             );

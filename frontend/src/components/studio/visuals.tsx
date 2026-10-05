@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from 'react';
 import { api, postJson } from '@/lib/api';
-import { ContentProject, Media } from '@/lib/studio';
+import { AestheticCollection, ContentProject, Media } from '@/lib/studio';
 import { usePlayer } from '../audio-player';
 
 export function Visuals({ project, setProject, disabled, pause, run }: { project: ContentProject; setProject: (project: ContentProject) => void; disabled: boolean; pause: () => void; run: (work: () => Promise<void>) => Promise<void> }) {
@@ -32,8 +32,16 @@ export function Visuals({ project, setProject, disabled, pause, run }: { project
     pause(); setPreview(false);
     setProject(await api<ContentProject>(`/studio/projects/${project.id}/draft`, postJson({ mode, media_ids: selected })));
   }
+  async function review() {
+    if (project.aesthetic.startsWith('custom:')) {
+      const collections = await api<AestheticCollection[]>('/studio/aesthetics');
+      const collection = collections.find(item => `custom:${item.id}` === project.aesthetic);
+      if (collection?.media.length) { setResults(collection.media); setReviewed(true); return; }
+    }
+    await search();
+  }
   return <section className="studio-panel"><h2>4. Visuals</h2><p>Stock footage from <a href="https://pixabay.com/" target="_blank" rel="noreferrer">Pixabay</a>. Landscape clips are center-cropped to vertical.</p>
-    <div className="studio-actions"><button disabled={disabled} onClick={() => void run(() => generate('automatic'))}>Generate Immediately</button><button disabled={disabled} onClick={() => void run(() => search())}>Review Media</button></div>
+    <div className="studio-actions"><button disabled={disabled} onClick={() => void run(() => generate('automatic'))}>Generate Immediately</button><button disabled={disabled} onClick={() => void run(review)}>Review Media</button></div>
     <form onSubmit={event => { event.preventDefault(); void run(() => search()); }}><label>Search visuals<input maxLength={100} value={query} onChange={event => setQuery(event.target.value)} placeholder="e.g. rain window" /></label><div className="studio-actions"><button disabled={disabled}>Search footage</button><button type="button" disabled={disabled} onClick={() => void run(async () => { setResults(await api<Media[]>('/studio/media/favorites')); setReviewed(true); })}>Saved clips</button><button type="button" disabled={disabled} onClick={() => void run(() => search(page % 10 + 1))}>Reroll results</button></div></form>
     {replace !== null && <p role="status">Choose a clip below to replace the selected segment. <button onClick={() => setReplace(null)}>Cancel replacement</button></p>}
     {reviewed && !results.length && <p>No clips found. Try another search.</p>}

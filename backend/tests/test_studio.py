@@ -126,6 +126,30 @@ class StudioTest(unittest.TestCase):
         for url in ('http://cdn.pixabay.com/a', 'https://localhost/a', 'https://cdn.pixabay.com.evil.test/a', 'file:///tmp/a', 'https://user@cdn.pixabay.com/a'):
             self.assertFalse(safe_media_url(url))
 
+    def test_reusable_aesthetics_ownership_keywords_and_curated_generation(self):
+        draft = self.draft()
+        media_id = draft['clips'][0]['media_id']
+        payload = {'name': 'My night collection', 'base_aesthetic': 'night-drive', 'keywords': ['rain', 'city'], 'media_ids': [media_id]}
+        created = self.client.post('/api/studio/aesthetics', json=payload)
+        self.assertEqual(created.status_code, 201, created.text)
+        collection = created.json()
+        key = f"custom:{collection['id']}"
+        self.assertEqual(self.other.get('/api/studio/aesthetics').json(), [])
+        self.assertEqual(self.other.put(f"/api/studio/aesthetics/{collection['id']}", json=payload).status_code, 404)
+        self.assertEqual(self.other.post('/api/studio/aesthetics', json=payload).status_code, 404)
+        self.assertEqual(self.edit(aesthetic=key).status_code, 200)
+        # Curated generation must not call Pixabay, even when no key is configured.
+        with patch('app.api.studio.PixabayProvider.search', side_effect=AssertionError('Curated pool should be used')):
+            response = self.client.post(self.url + '/draft', json={'mode': 'automatic'})
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()['clips'][0]['media_id'], media_id)
+        self.assertEqual(self.client.put(f"/api/studio/aesthetics/{collection['id']}", json={**payload, 'name': 'Renamed', 'keywords': ['moon']}).status_code, 200)
+        presets = self.client.get('/api/studio/presets').json()['aesthetics']
+        self.assertEqual(next(item['name'] for item in presets if item['id'] == key), 'Renamed')
+        with patch('app.api.studio.PixabayProvider.search', return_value=self.footage()) as search:
+            self.client.post('/api/studio/visuals/search', json={'aesthetic': key})
+            search.assert_called_once_with('moon', 1)
+
     def test_reroll_replace_and_section_reset_preserve_source(self):
         draft = self.draft()
         with patch('app.api.studio.PixabayProvider.search', return_value=self.footage()):

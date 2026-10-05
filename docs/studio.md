@@ -43,9 +43,9 @@ Run the worker as an additional systemd service using the same user, backend wor
 ## Workflow
 
 1. Create New, search your Library, choose a specific version. The version is pinned for this draft.
-2. Select start/end or a 10/15/20/30-second shortcut. Preview or seek with the existing waveform. Sections must fit the actual audio, with an MVP maximum of 60 seconds.
+2. Choose a 10/15/20/30-second duration, then drag the highlighted waveform window to position it. The time ruler shows minutes/seconds; dragging preserves duration. Keyboard arrows move by one second (Shift: five); Home/End reach the bounds. Exact start/end fields remain available. Save section before syncing. Sections must fit the actual audio, with an MVP maximum of 60 seconds.
 3. Paste lyrics and choose an aesthetic/style; Save draft. Original whitespace and line breaks are stored. Blank lines are preserved in the source text but skipped for synchronization.
-4. Restart syncing, tap at the start of each line, undo or adjust times, then Save timing. Times are relative to the section. The last line ends with the section. Changing lyrics or section resets timing; changing the section also resets the sequence.
+4. Restart syncing, tap at the start of each line, undo or adjust times, then Save timing. Preview synced lyrics uses the timestamps currently visible in the inputs, even before saving; all lines need valid increasing times. Times are relative to the section. The last line ends with the section. Changing lyrics or section resets timing; changing the section also resets the sequence.
 5. Generate Immediately, or Review Media. Search, preview, save favorite clips, select/deselect, and Generate Draft. Selected IDs persist in the generated sequence; unsaved selection checkboxes are local to the current visit. Clips use up to four seconds each; choose enough distinct clips to cover the section.
 6. Preview draft, replace a segment, reroll visuals or order. These actions preserve lyrics, timing, source and section. Browser previews are approximate; final cuts are rendered by FFmpeg.
 7. Render video, wait for the worker, preview and download the private MP4. Each export records its draft revision; subsequent edits do not mutate queued exports. Old exports remain available until the Studio draft is deleted.
@@ -53,6 +53,10 @@ Run the worker as an additional systemd service using the same user, backend wor
 Section previews share the global audio engine, pause normal listening and do not record streams. Leaving the editor restores the previous Library source/position, paused. Stock/export video playback pauses audio to avoid overlap.
 
 ## Provider and rendering behavior
+
+In Lyrics & look, **Customize aesthetic** makes a private reusable collection from a built-in preset. Name it, edit its search keywords, and choose videos via search or saved clips. **Edit aesthetic collection** updates your collection across drafts; built-in presets remain unchanged. Save the draft to apply the chosen collection. Generate Immediately uses its curated video pool if populated (choose enough videos to fill the section), otherwise it searches the collection's keywords. Existing draft sequences and rendered exports are not rewritten by editing a collection.
+
+Collections live in the additive `aesthetic_collections` table, with owner, name, base preset, keyword list and validated owned media IDs. `GET/POST /api/studio/aesthetics` lists/creates collections; `PUT /api/studio/aesthetics/{id}` edits them. Existing `content_projects.aesthetic` values remain valid; personal collections use `custom:<id>`. All reads, edits, searches and clip selections enforce ownership.
 
 Pixabay is behind a `VisualProvider` interface. Each preset has weighted keyword groups; up to three distinct searches are interleaved and deduplicated. Search responses are cached on disk for 24 hours. Vertical footage is ranked ahead of footage requiring more cropping. Preview cards link to Pixabay. Only chosen render clips are downloaded, with HTTPS host checks, no redirects, bounded sizes and video content-type checks. The browser never receives the API key and cannot submit download paths or URLs.
 

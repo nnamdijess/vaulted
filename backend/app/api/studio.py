@@ -5,8 +5,8 @@ from fastapi.responses import FileResponse
 from sqlalchemy import select
 from app.api.music import Database, require_record, lock_track_order
 from app.models.music import Song, SongVersion, Project, utc_now
-from app.models.studio import ContentProject, ContentLyricLine, ContentMedia, ContentClip, ContentRenderJob
-from app.schemas.studio import Create, Edit, Timing, Search, Draft, Replace, Favorite
+from app.models.studio import ContentProject, ContentLyricLine, ContentMedia, ContentClip, ContentRenderJob, AestheticCollection
+from app.schemas.studio import Create, Edit, Timing, Search, Draft, Replace, Favorite, CollectionInput
 from app.services.studio_presets import RECIPES, STYLES
 from app.services.studio_storage import duration, content_path
 from app.services.visual_provider import PixabayProvider
@@ -44,10 +44,63 @@ def changed(project):
     project.status = 'draft'
 
 
+def collection_for(db, aesthetic):
+    if aesthetic.startswith('custom:'):
+        try:
+            identifier = int(aesthetic.split(':', 1)[1])
+        except ValueError:
+            raise HTTPException(422, 'Invalid aesthetic') from None
+        return owned(db, AestheticCollection, identifier)
+    if aesthetic not in RECIPES:
+        raise HTTPException(422, 'Unknown aesthetic')
+    return None
+
+
+def collection_view(item, db):
+    media = [owned(db, ContentMedia, identifier) for identifier in item.media_ids]
+    return {'id': item.id, 'name': item.name, 'base_aesthetic': item.base_aesthetic, 'keywords': item.keywords,
+            'media_ids': item.media_ids, 'media': [{'id': m.id, 'favorite': m.favorite, **m.metadata_json} for m in media]}
+
+
+@router.get('/aesthetics')
+def collections(db: Database):
+    return [collection_view(item, db) for item in db.scalars(select(AestheticCollection).where(AestheticCollection.owner_id == db.info['owner_id']))]
+
+
+def validate_collection(data, db):
+    if data.base_aesthetic not in RECIPES:
+        raise HTTPException(422, 'Choose a built-in base aesthetic')
+    for identifier in data.media_ids:
+        owned(db, ContentMedia, identifier)
+
+
+@router.post('/aesthetics', status_code=201)
+def create_collection(data: CollectionInput, db: Database):
+    validate_collection(data, db)
+    item = AestheticCollection(owner_id=db.info['owner_id'], **data.model_dump())
+    db.add(item)
+    db.commit()
+    return collection_view(item, db)
+
+
+@router.put('/aesthetics/{identifier}')
+def edit_collection(identifier: int, data: CollectionInput, db: Database):
+    lock_track_order(db)
+    item = owned(db, AestheticCollection, identifier)
+    validate_collection(data, db)
+    for key, value in data.model_dump().items():
+        setattr(item, key, value)
+    db.commit()
+    return collection_view(item, db)
+
+
 @router.get('/presets')
 def presets(db: Database):
     return {'aesthetics': [{'id': key, 'name': value[0], 'keywords': [{'query': q, 'weight': w} for q, w in value[1]]}
-                           for key, value in RECIPES.items()], 'styles': [{'id': key, 'name': value} for key, value in STYLES.items()]}
+                           for key, value in RECIPES.items()] + [
+                               {'id': f'custom:{item.id}', 'name': item.name, 'keywords': [{'query': q, 'weight': 1} for q in item.keywords]}
+                               for item in db.scalars(select(AestheticCollection).where(AestheticCollection.owner_id == db.info['owner_id']))],
+            'styles': [{'id': key, 'name': value} for key, value in STYLES.items()]}
 
 
 @router.get('/songs')
@@ -91,7 +144,8 @@ def edit(identifier: int, data: Edit, db: Database):
     lock_track_order(db)
     project = owned(db, ContentProject, identifier)
     version = require_record(db, SongVersion, project.song_version_id)
-    if not data.title.strip() or data.aesthetic not in RECIPES or data.lyric_style not in STYLES:
+    collection_for(db, data.aesthetic)
+    if not data.title.strip() or data.lyric_style not in STYLES:
         raise HTTPException(422, 'Choose a title and valid presets')
     if not 0 < data.end_time - data.start_time <= 60 or data.end_time > duration(version) + 0.01:
         raise HTTPException(422, 'Section must fit the song and be at most 60 seconds')
@@ -127,9 +181,8 @@ def timings(identifier: int, data: Timing, db: Database):
 
 
 def search_media(data, db):
-    if data.aesthetic not in RECIPES:
-        raise HTTPException(422, 'Unknown aesthetic')
-    recipe = RECIPES[data.aesthetic][1]
+    collection = collection_for(db, data.aesthetic)
+    recipe = [(q, 1) for q in collection.keywords] if collection else RECIPES[data.aesthetic][1]
     # Three distinct weighted queries; round-robin results avoids one-query domination.
     queries = [data.query.strip()] if data.query.strip() else []
     pool = list(recipe)
@@ -183,10 +236,15 @@ def draft(identifier: int, data: Draft, db: Database):
     project = owned(db, ContentProject, identifier)
     ids = data.media_ids
     if data.mode in ('automatic', 'reroll'):
-        results = search_media(Search(aesthetic=project.aesthetic, count=30, page=random.randint(1, 3) if data.mode == 'reroll' else 1), db)
+        collection = collection_for(db, project.aesthetic)
+        results = [{'id': identifier} for identifier in collection.media_ids] if collection and collection.media_ids else search_media(Search(aesthetic=project.aesthetic, count=30, page=random.randint(1, 3) if data.mode == 'reroll' else 1), db)
         old = {clip.media_id for clip in project.clips}
-        ids = [item['id'] for item in results if item['id'] not in old] or [item['id'] for item in results]
+        ids = [item['id'] for item in results if item['id'] not in old]
+        previous = [item['id'] for item in results if item['id'] in old]
         random.shuffle(ids)
+        random.shuffle(previous)
+        # Prefer new clips, but keep enough curated footage to fill the section.
+        ids.extend(previous)
     elif data.mode == 'order':
         ids = list(dict.fromkeys(clip.media_id for clip in project.clips))
         random.shuffle(ids)
@@ -236,6 +294,8 @@ def render(identifier: int, db: Database):
     if not project.clips or any(line.start_time is None for line in project.lines):
         raise HTTPException(422, 'Generate a draft and time every lyric line before rendering')
     snapshot = view(project, db)
+    collection = collection_for(db, project.aesthetic)
+    snapshot['render_aesthetic'] = collection.base_aesthetic if collection else project.aesthetic
     # JSON snapshot is intentionally separate from live ORM relationships.
     snapshot.pop('jobs')
     snapshot.pop('created_at')

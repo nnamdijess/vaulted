@@ -49,3 +49,24 @@ class Replace(Input):
 
 class Favorite(Input):
     favorite: bool
+
+
+class CollectionInput(Input):
+    name: str = Field(min_length=1, max_length=100)
+    base_aesthetic: str
+    keywords: list[str] = Field(min_length=1, max_length=12)
+    media_ids: list[int] = Field(default_factory=list, max_length=100)
+
+    @field_validator('name')
+    @classmethod
+    def clean_name(cls, value):
+        if not value.strip():
+            raise ValueError('Name is required')
+        return value.strip()
+
+    @field_validator('keywords')
+    @classmethod
+    def clean_keywords(cls, value):
+        if any(not word.strip() or len(word.strip()) > 100 for word in value):
+            raise ValueError('Each keyword must be 1–100 characters')
+        return list(dict.fromkeys(word.strip() for word in value))
