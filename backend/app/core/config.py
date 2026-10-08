@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     uploads_dir: Path = REPOSITORY_ROOT / "uploads"
     content_dir: Path = REPOSITORY_ROOT / "content"
     pixabay_api_key: str = ""
+    pexels_api_key: str = ""
     ffmpeg_binary: str = ""
     ffprobe_binary: str = "ffprobe"
     max_stock_bytes: int = 150 * 1024 * 1024

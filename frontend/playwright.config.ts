@@ -19,7 +19,7 @@ export default defineConfig({
         DATABASE_URL: `sqlite:///${path.join(dataRoot, "music.db").replaceAll("\\", "/")}`,
         UPLOADS_DIR: path.join(dataRoot, "uploads"),
         CONTENT_DIR: path.join(dataRoot, "content"),
-        PIXABAY_API_KEY: "",
+        PIXABAY_API_KEY: "", PEXELS_API_KEY: "",
         CORS_ORIGINS: '["http://127.0.0.1:3011"]',
         MAX_UPLOAD_BYTES: "1048576",
       },

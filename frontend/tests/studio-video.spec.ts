@@ -21,8 +21,11 @@ test('draft timeline plays across sections, seeks and replaces only the selected
   draft.end_time = 8;
   draft.lines = [{ text: 'First lyric', start_time: 0, end_time: 4 }, { text: 'Second lyric', start_time: 4, end_time: 8 }];
   draft.clips = [0, 1].map(index => ({ id: index + 1, start_time: index * 4, end_time: (index + 1) * 4, source_start: 0, media: { ...media, preview_url: `/test-preview.mp4?clip=${index}` } }));
-  const replacement = { ...media, id: 2, preview_url: '/test-preview.mp4?replacement', tags: 'Replacement footage' };
-  await page.route('**/api/studio/visuals/search', route => route.fulfill({ json: [replacement] }));
+  const replacement = { ...media, id: 2, provider: 'pexels', author: 'Test creator', source_url: 'https://www.pexels.com/video/12/', preview_url: '/test-preview.mp4?replacement', tags: 'Replacement footage' };
+  await page.route('**/api/studio/visuals/search', route => {
+    expect(route.request().postDataJSON().provider).toBe('pexels');
+    return route.fulfill({ json: [replacement] });
+  });
   await page.route(`**/api/studio/projects/${draft.id}/clips/2`, async route => {
     expect(route.request().method()).toBe('PUT');
     expect(route.request().postDataJSON()).toEqual({ media_id: 2 });
@@ -66,7 +69,9 @@ test('draft timeline plays across sections, seeks and replaces only the selected
   await section2.click();
   await page.getByRole('button', { name: 'Replace selected clip' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Choose footage' })).toContainText('section 2');
+  await page.getByLabel('Footage source').selectOption('pexels');
   await page.getByRole('button', { name: 'Search footage', exact: true }).click();
+  await expect(page.getByRole('link', { name: 'Video by Test creator on Pexels' })).toBeVisible();
   await page.getByRole('button', { name: 'Use replacement', exact: true }).click();
   await expect(preview).toHaveAttribute('src', replacement.preview_url);
   await expect(section2).toHaveAttribute('aria-label', 'Select section 2, 0:04.0 to 0:08.0');

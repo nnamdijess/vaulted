@@ -153,11 +153,66 @@ class StudioTest(unittest.TestCase):
         self.client.put(url, json={**style, 'font': 'lobster'})
         with self.sessions() as db:
             self.assertEqual(db.get(ContentRenderJob, job['id']).snapshot['text_style'], style)
-        for font in ('abel', 'anton', 'lobster'):
+        for font in ('abel', 'anton', 'lobster', 'blackletter', 'mono'):
             response = self.client.get(f'/api/studio/fonts/{font}')
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.content[:4], b'\x00\x01\x00\x00')
+        for font, family in [('blackletter', 'UnifrakturCook'), ('mono', 'Space Mono')]:
+            custom = self.client.put(url, json={**style, 'font': font}).json()
+            self.assertIn(f'Default,{family},48', subtitles(custom))
         self.assertEqual(self.client.get('/api/studio/fonts/unknown').status_code, 404)
+
+    def test_pexels_contract_cache_limits_and_hosts(self):
+        import httpx
+        from fastapi import HTTPException
+        from app.services.visual_provider import PexelsProvider
+        with patch.object(settings, 'pexels_api_key', ''):
+            response = self.client.post('/api/studio/visuals/search', json={'provider': 'pexels', 'query': 'rain'})
+            self.assertEqual(response.status_code, 503)
+            self.assertIn('PEXELS_API_KEY', response.text)
+        hit = {'id': 12, 'duration': 8, 'image': 'https://images.pexels.com/videos/12.jpg', 'user': {'name': 'Creator'},
+               'video_files': [
+                   {'file_type': 'video/mp4', 'width': 1080, 'height': 1920, 'link': 'https://videos.pexels.com/video-files/12/hd.mp4'},
+                   {'file_type': 'video/mp4', 'width': 360, 'height': 640, 'link': 'https://videos.pexels.com/video-files/12/sd.mp4'},
+                   {'file_type': 'video/mp4', 'width': 1080, 'height': 1920, 'link': 'http://localhost/private'}]}
+        req = httpx.Request('GET', 'https://api.pexels.com/v1/videos/search')
+        with patch.object(settings, 'pexels_api_key', 'test-only-key'), patch('httpx.Client.get', return_value=httpx.Response(200, json={'videos': [hit]}, request=req)) as get:
+            result = PexelsProvider().search('rain', 2)
+            self.assertEqual(result[0]['author'], 'Creator')
+            self.assertTrue(result[0]['video_url'].endswith('hd.mp4'))
+            self.assertTrue(result[0]['preview_url'].endswith('sd.mp4'))
+            self.assertNotIn('test-only-key', str(result))
+            self.assertEqual(PexelsProvider().search('rain', 2), result)
+            self.assertEqual(get.call_count, 1)
+            self.assertEqual(get.call_args.kwargs['headers'], {'Authorization': 'test-only-key'})
+            self.assertEqual(get.call_args.kwargs['params']['page'], 2)
+            get.return_value = httpx.Response(429, request=req)
+            with self.assertRaises(HTTPException) as error:
+                PexelsProvider().search('uncached')
+            self.assertEqual(error.exception.status_code, 429)
+        self.assertTrue(safe_media_url('https://videos.pexels.com/video-files/a.mp4'))
+        for url in ('https://videos.pexels.com.evil.test/a', 'http://videos.pexels.com/a', 'https://videos.pexels.com:8080/a', 'https://user@videos.pexels.com/a'):
+            self.assertFalse(safe_media_url(url))
+        self.assertFalse(safe_media_url('https://videos.pexels.com/a', 'pixabay'))
+
+    def test_pexels_identity_generation_and_mixed_replacement(self):
+        original = self.draft()
+        footage = [{**item, 'provider': 'pexels', 'preview_url': 'https://videos.pexels.com/video-files/a.mp4',
+                    'video_url': 'https://videos.pexels.com/video-files/a.mp4', 'source_url': 'https://www.pexels.com/video/12/'} for item in self.footage()]
+        with patch('app.api.studio.PexelsProvider.search', return_value=footage) as search:
+            response = self.client.post('/api/studio/visuals/search', json={'provider': 'pexels', 'query': 'rain'}).json()
+            search.assert_called_once_with('rain', 1)
+            # Same external ID is a different record when the provider differs.
+            self.assertNotEqual(response[0]['id'], original['clips'][0]['media_id'])
+            updated = self.client.put(self.url + f"/clips/{original['clips'][0]['id']}", json={'media_id': response[0]['id']}).json()
+            self.assertEqual(updated['clips'][0]['media']['provider'], 'pexels')
+            generated = self.client.post(self.url + '/draft', json={'mode': 'automatic', 'provider': 'pexels'})
+            self.assertEqual(generated.status_code, 200, generated.text)
+            self.assertEqual(generated.json()['clips'][0]['media']['provider'], 'pexels')
+            saved = self.client.patch(f"/api/studio/media/{response[0]['id']}", json={'favorite': True})
+            self.assertEqual(saved.status_code, 200)
+            self.assertEqual(self.client.get('/api/studio/media/favorites').json()[0]['provider'], 'pexels')
+            self.assertEqual(self.other.patch(f"/api/studio/media/{response[0]['id']}", json={'favorite': True}).status_code, 404)
 
     def test_reusable_aesthetics_ownership_keywords_and_curated_generation(self):
         draft = self.draft()

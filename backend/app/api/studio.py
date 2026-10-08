@@ -7,10 +7,10 @@ from app.api.music import Database, require_record, lock_track_order
 from app.models.music import Song, SongVersion, Project, utc_now
 from app.models.studio import ContentProject, ContentLyricLine, ContentMedia, ContentClip, ContentRenderJob, AestheticCollection
 from app.schemas.studio import Create, Edit, Timing, Search, Draft, Replace, Favorite, CollectionInput, TextStyle
-from app.services.studio_fonts import FONT_DIR, FONTS
+from app.services.studio_fonts import FONT_DIR, FONT_FILES
 from app.services.studio_presets import RECIPES, STYLES
 from app.services.studio_storage import duration, content_path
-from app.services.visual_provider import PixabayProvider
+from app.services.visual_provider import PixabayProvider, PexelsProvider
 
 router = APIRouter(prefix='/studio', tags=['studio'])
 
@@ -106,9 +106,9 @@ def presets(db: Database):
 
 @router.get('/fonts/{font_id}')
 def font_file(font_id: str, db: Database):
-    if font_id not in FONTS:
+    if font_id not in FONT_FILES:
         raise HTTPException(404, 'Font not found')
-    return FileResponse(FONT_DIR / f'{FONTS[font_id]}-Regular.ttf', media_type='font/ttf',
+    return FileResponse(FONT_DIR / FONT_FILES[font_id], media_type='font/ttf',
                         headers={'Cache-Control': 'private, max-age=86400'})
 
 
@@ -209,7 +209,8 @@ def search_media(data, db):
         choice = random.choices(pool, weights=[weight for _, weight in pool])[0]
         queries.append(choice[0])
         pool.remove(choice)
-    batches = [PixabayProvider().search(query, data.page) for query in queries]
+    provider = PexelsProvider() if data.provider == 'pexels' else PixabayProvider()
+    batches = [provider.search(query, data.page) for query in queries]
     items, seen = [], set()
     for index in range(max(map(len, batches), default=0)):
         for batch in batches:
@@ -219,9 +220,9 @@ def search_media(data, db):
             if value['provider_id'] in seen:
                 continue
             seen.add(value['provider_id'])
-            media = db.scalar(select(ContentMedia).where(ContentMedia.owner_id == db.info['owner_id'], ContentMedia.provider_id == value['provider_id']))
+            media = db.scalar(select(ContentMedia).where(ContentMedia.owner_id == db.info['owner_id'], ContentMedia.provider == data.provider, ContentMedia.provider_id == value['provider_id']))
             if media is None:
-                media = ContentMedia(owner_id=db.info['owner_id'], provider_id=value['provider_id'], metadata_json=value)
+                media = ContentMedia(owner_id=db.info['owner_id'], provider=data.provider, provider_id=value['provider_id'], metadata_json=value)
                 db.add(media)
                 db.flush()
             items.append({'id': media.id, 'favorite': media.favorite, **media.metadata_json})
@@ -256,7 +257,7 @@ def draft(identifier: int, data: Draft, db: Database):
     ids = data.media_ids
     if data.mode in ('automatic', 'reroll'):
         collection = collection_for(db, project.aesthetic)
-        results = [{'id': identifier} for identifier in collection.media_ids] if collection and collection.media_ids else search_media(Search(aesthetic=project.aesthetic, count=30, page=random.randint(1, 3) if data.mode == 'reroll' else 1), db)
+        results = [{'id': identifier} for identifier in collection.media_ids] if collection and collection.media_ids else search_media(Search(aesthetic=project.aesthetic, provider=data.provider, count=30, page=random.randint(1, 3) if data.mode == 'reroll' else 1), db)
         old = {clip.media_id for clip in project.clips}
         ids = [item['id'] for item in results if item['id'] not in old]
         previous = [item['id'] for item in results if item['id'] in old]

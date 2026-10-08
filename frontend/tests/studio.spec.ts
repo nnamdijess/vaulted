@@ -29,6 +29,16 @@ test('Studio text panel previews, cancels and saves color font and alignment', a
   await expect(panel.getByRole('button', { name: 'Lobster', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(sample).toHaveCSS('color', 'rgb(18, 171, 239)');
   await expect(sample).toHaveCSS('text-align', 'left');
+  for (const [label, font] of [['Blackletter', 'blackletter'], ['Mono', 'mono']]) {
+    await panel.getByRole('button', { name: label, exact: true }).click();
+    await expect.poll(() => page.evaluate(async family => (await document.fonts.load(`20px "Vaulted ${family}"`)).length, label)).toBe(1);
+    await panel.getByRole('button', { name: 'Save text style' }).click();
+    await expect(panel.getByRole('status')).toHaveText('Text style saved.');
+    await page.reload();
+    await page.getByRole('button', { name: '4. Visuals', exact: true }).click();
+    await expect(panel.getByRole('button', { name: label, exact: true })).toHaveAttribute('aria-pressed', 'true');
+    expect((await (await request.get(`http://127.0.0.1:8011/api/studio/projects/${draft.id}`)).json()).text_style.font).toBe(font);
+  }
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.screenshot({ path: testInfo.outputPath('text-panel-desktop.png'), fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
@@ -67,6 +77,9 @@ test('Studio mobile song, section, lyrics and private draft flow', async ({ page
   await page.getByRole('button', { name: '4. Visuals', exact: true }).click();
   await page.getByRole('button', { name: 'Review Media', exact: true }).click();
   await expect(page.getByRole('alert').filter({ hasText: 'PIXABAY_API_KEY' })).toBeVisible();
+  await page.getByLabel('Footage source').selectOption('pexels');
+  await page.getByRole('button', { name: 'Review Media', exact: true }).click();
+  await expect(page.getByRole('alert').filter({ hasText: 'PEXELS_API_KEY' })).toBeVisible();
   expect(errors).toEqual([]);
   const endpoint = page.url().match(/\/studio\/(\d+)/)![1];
   const anonymous = await page.context().browser()!.newContext();

@@ -111,7 +111,23 @@ Existing drafts retain their preset appearance until customized. Startup adds th
 `content_projects.text_style` JSON column without resetting data. Export jobs snapshot the
 style, so editing a draft cannot change a previously queued export. Restart the backend and
 Studio worker after updating. Bundled fonts and licenses live in `backend/app/assets/studio-fonts`.
-Font file uploads and per-line styles are not part of this interface.
+Blackletter (UnifrakturCook) and Mono (Space Mono) are also bundled. Type ordinary
+lyrics and select the font; these choices do not replace letters with mathematical
+Unicode symbols. Font file uploads and per-line styles are not part of this interface.
+
+### Pexels footage
+
+Get a key from https://www.pexels.com/api/ and add `PEXELS_API_KEY=your_key` to
+`backend/.env` alongside the existing Pixabay key. Restart the backend and worker.
+Choose Pexels in **Footage source** in Visuals or the aesthetic editor. The selected
+source is used for searches and automatic/rerolled drafts; curated collections and
+saved selections may contain clips from both providers. Each clip retains its source
+and creator attribution. A new key is never sent to the browser or stored in media metadata.
+
+Pexels uses its own 24-hour search cache and HTTPS video-host allowlist. The downloader
+still enforces the existing size, content-type and MP4 checks and rejects redirects.
+Existing Pixabay media and projects require no migration. Tests mock Pexels; live
+searches require your own key and remain subject to Pexels API limits.
 
 Backend: `python -m unittest discover -s tests` from backend. Provider network requests are mocked; a short local synthetic clip exercises actual FFmpeg rendering. Frontend: `npm.cmd run lint`, `npm.cmd run typecheck`, `npm.cmd run build`, `npm.cmd run test:e2e`. Playwright uses isolated SQLite/upload/content directories and an empty provider key.
 

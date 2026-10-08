@@ -33,11 +33,12 @@ class Timing(Input):
 
 class TextStyle(Input):
     color: str = Field(pattern=r'^#[0-9a-fA-F]{6}$')
-    font: Literal['default', 'abel', 'anton', 'lobster']
+    font: Literal['default', 'abel', 'anton', 'lobster', 'blackletter', 'mono']
     align: Literal['left', 'center', 'right']
 
 
 class Search(Input):
+    provider: Literal['pixabay', 'pexels'] = 'pixabay'
     aesthetic: str = 'night-drive'
     query: str = Field(default='', max_length=100)
     page: int = Field(default=1, ge=1, le=10)
@@ -45,6 +46,7 @@ class Search(Input):
 
 
 class Draft(Input):
+    provider: Literal['pixabay', 'pexels'] = 'pixabay'
     media_ids: list[int] = Field(default_factory=list, max_length=30)
     mode: Literal['selected', 'automatic', 'reroll', 'order'] = 'selected'
 

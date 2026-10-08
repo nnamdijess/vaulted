@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ContentProject } from '@/lib/studio';
 import { usePlayer } from '../audio-player';
 import { timestamp } from './section-selector';
+import { MediaCredit } from './media-provider';
 import { TextStyle, lyricCss, resolveTextStyle } from '@/lib/studio-text-style';
 
 type Clip = ContentProject['clips'][number];
@@ -90,7 +91,7 @@ export function DraftTimeline({ project, disabled, onReplace, textStyle }: {
       </div>
     </div>
     <div className="studio-selected-section">
-      <div><strong>Section {index + 1}</strong><p>{timestamp(clip.start_time)}–{timestamp(clip.end_time)} · {clip.media.tags}</p></div>
+      <div><strong>Section {index + 1}</strong><p>{timestamp(clip.start_time)}–{timestamp(clip.end_time)} · {clip.media.tags}</p><MediaCredit media={clip.media} /></div>
       <button disabled={disabled} onClick={() => { seek(clip.start_time); onReplace(clip); }}>Replace selected clip</button>
     </div>
     <small>Preview plays your sequence with music and lyrics. Export produces the final video with frame-aligned cuts.</small>

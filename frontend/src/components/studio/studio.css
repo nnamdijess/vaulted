@@ -2,6 +2,8 @@
 @font-face { font-family: 'Vaulted Abel'; src: url('/api/studio/fonts/abel') format('truetype'); font-display: swap; }
 @font-face { font-family: 'Vaulted Anton'; src: url('/api/studio/fonts/anton') format('truetype'); font-display: swap; }
 @font-face { font-family: 'Vaulted Lobster'; src: url('/api/studio/fonts/lobster') format('truetype'); font-display: swap; }
+@font-face { font-family: 'Vaulted Blackletter'; src: url('/api/studio/fonts/blackletter') format('truetype'); font-display: swap; }
+@font-face { font-family: 'Vaulted Mono'; src: url('/api/studio/fonts/mono') format('truetype'); font-display: swap; }
 .studio-visual-layout { display: grid; grid-template-columns: minmax(0, 1fr) 290px; gap: 28px; align-items: start; }
 .studio-visual-layout > div { min-width: 0; }
 .studio-text-panel { padding: 18px; border: 1px solid var(--line); border-radius: 16px; }
