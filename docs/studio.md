@@ -129,6 +129,35 @@ still enforces the existing size, content-type and MP4 checks and rejects redire
 Existing Pixabay media and projects require no migration. Tests mock Pexels; live
 searches require your own key and remain subject to Pexels API limits.
 
+### Your uploaded clip library
+
+In Studio > Visuals, open Review Media if a draft already exists, then use **Video files**
+and **Upload videos**. Multiple selections upload sequentially. Each successful file is
+saved immediately; if one fails, earlier uploads remain saved and remaining files can be retried.
+Use **Edit clip details** for titles and comma-separated tags, then **Search saved clips**
+to filter by title or tags. Select saved uploads together with stock clips to generate a draft,
+replace a timeline section, or add them to a reusable aesthetic using its Saved clips picker.
+Automatic stock generation still uses the chosen provider; custom aesthetic collections can
+generate from their saved uploaded footage without a provider API call.
+
+Uploads accept MP4/MOV/M4V/WebM, up to `MAX_UPLOAD_BYTES` (250 MiB by default), and
+10 minutes. FFmpeg validates actual video content and creates a silent H.264 MP4,
+at most 1280 pixels per dimension without upscaling, plus a JPEG poster. Keep originals
+elsewhere if you need their full resolution or original audio. Processing has a 90-second
+conversion timeout; very large clips on slow servers may need trimming before upload.
+One upload conversion runs per backend process at a time, with two encoder threads.
+This is request-based processing, not a durable background queue.
+
+Files live under `CONTENT_DIR/library/<random UUID>/`. Existing ContentMedia JSON metadata
+stores relative paths, title and tags; no schema migration is required. Preview/poster endpoints
+require the owning account. Uploaded footage is read locally by the export worker, not fetched
+over HTTP. No AI service, fees or automatic analysis are enabled.
+
+Files selected from USB are copied into managed storage; unplug only after upload succeeds.
+For Ubuntu migration, stop the app/worker and transfer both the SQLite database and complete
+uploads/content directories, preserving relative paths. Set `CONTENT_DIR` to the Ubuntu location.
+Uploading on the development laptop does not automatically transfer files to the server.
+
 Backend: `python -m unittest discover -s tests` from backend. Provider network requests are mocked; a short local synthetic clip exercises actual FFmpeg rendering. Frontend: `npm.cmd run lint`, `npm.cmd run typecheck`, `npm.cmd run build`, `npm.cmd run test:e2e`. Playwright uses isolated SQLite/upload/content directories and an empty provider key.
 
 Manual live-provider smoke test after adding your key: choose a song, time two lyric lines, Review Media, preview and select enough clips, generate a draft, replace a clip, render with worker running, preview/download. Verify a different account cannot access the draft or export. Test at 390px and on your actual iPhone PWA (browser emulation does not fully represent iOS media behavior).

@@ -58,7 +58,9 @@ def render(job_id, snapshot, update_progress):
         for index, clip in enumerate(snapshot['clips']):
             media = clip['media']
             stock = content_path(f"projects/{project_id}/stock/{clip['media_id']}.mp4")
-            if not stock.is_file():
+            if media.get('provider') == 'upload':
+                stock = content_path(media['local_path'])
+            elif not stock.is_file():
                 download_video(media['video_url'], stock)
             filename = f'clip-{index}.mp4'
             treatment = ',hue=s=0' if snapshot.get('render_aesthetic', snapshot['aesthetic']) == 'black-white' else ''

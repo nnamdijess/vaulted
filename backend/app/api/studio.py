@@ -1,8 +1,8 @@
 import random
 import shutil
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, HTTPException, Response, UploadFile
 from fastapi.responses import FileResponse
-from sqlalchemy import select
+from sqlalchemy import select, or_
 from app.api.music import Database, require_record, lock_track_order
 from app.models.music import Song, SongVersion, Project, utc_now
 from app.models.studio import ContentProject, ContentLyricLine, ContentMedia, ContentClip, ContentRenderJob, AestheticCollection
@@ -11,6 +11,8 @@ from app.services.studio_fonts import FONT_DIR, FONT_FILES
 from app.services.studio_presets import RECIPES, STYLES
 from app.services.studio_storage import duration, content_path
 from app.services.visual_provider import PixabayProvider, PexelsProvider
+from app.services.video_upload import ingest_video
+from app.schemas.studio import MediaDetails
 
 router = APIRouter(prefix='/studio', tags=['studio'])
 
@@ -239,8 +241,55 @@ def search(data: Search, db: Database):
 
 
 @router.get('/media/favorites')
-def favorites(db: Database):
-    return [{'id': item.id, 'favorite': item.favorite, **item.metadata_json} for item in db.scalars(select(ContentMedia).where(ContentMedia.owner_id == db.info['owner_id'], ContentMedia.favorite.is_(True)))]
+def favorites(db: Database, q: str = ''):
+    if len(q) > 100:
+        raise HTTPException(422, 'Search is too long')
+    return [{'id': item.id, 'favorite': item.favorite, **item.metadata_json} for item in db.scalars(select(ContentMedia).where(ContentMedia.owner_id == db.info['owner_id'], or_(ContentMedia.favorite.is_(True), ContentMedia.provider == 'upload')).order_by(ContentMedia.id.desc()))
+            if q.casefold() in f"{item.metadata_json.get('title', '')} {item.metadata_json.get('tags', '')}".casefold()]
+
+
+@router.post('/media/upload', status_code=201)
+def upload_media(db: Database, file: UploadFile):
+    identifier, metadata = ingest_video(file)
+    try:
+        media = ContentMedia(owner_id=db.info['owner_id'], provider='upload', provider_id=identifier,
+                             metadata_json=metadata, favorite=True)
+        db.add(media)
+        db.flush()
+        url = f'/api/studio/media/{media.id}'
+        media.metadata_json = {**metadata, 'preview_url': url + '/video', 'video_url': url + '/video', 'thumbnail': url + '/poster'}
+        db.commit()
+        return {'id': media.id, 'favorite': True, **media.metadata_json}
+    except Exception:
+        db.rollback()
+        shutil.rmtree(content_path(f'library/{identifier}'), ignore_errors=True)
+        raise
+    finally:
+        file.file.close()
+
+
+@router.get('/media/{identifier}/video')
+def uploaded_video(identifier: int, db: Database):
+    media = owned(db, ContentMedia, identifier)
+    if media.provider != 'upload':
+        raise HTTPException(404, 'Upload not found')
+    return FileResponse(content_path(media.metadata_json['local_path']), media_type='video/mp4', headers={'Cache-Control': 'private, no-store'})
+
+
+@router.get('/media/{identifier}/poster')
+def uploaded_poster(identifier: int, db: Database):
+    media = owned(db, ContentMedia, identifier)
+    if media.provider != 'upload':
+        raise HTTPException(404, 'Upload not found')
+    return FileResponse(content_path(media.metadata_json['local_path']).with_name('poster.jpg'), media_type='image/jpeg', headers={'Cache-Control': 'private, no-store'})
+
+
+@router.put('/media/{identifier}/details')
+def media_details(identifier: int, data: MediaDetails, db: Database):
+    media = owned(db, ContentMedia, identifier)
+    media.metadata_json = {**media.metadata_json, 'title': data.title.strip(), 'tags': data.tags.strip()}
+    db.commit()
+    return {'id': media.id, 'favorite': media.favorite, **media.metadata_json}
 
 
 @router.patch('/media/{identifier}')

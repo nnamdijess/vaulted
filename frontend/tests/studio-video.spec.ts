@@ -93,3 +93,38 @@ test('draft timeline plays across sections, seeks and replaces only the selected
   await page.getByRole('button', { name: '3. Sync', exact: true }).click();
   await expect(page.getByTestId('global-audio')).toHaveJSProperty('paused', true);
 });
+
+
+test('uploaded clips can be previewed, tagged, filtered and used in a draft on mobile', async ({ page, request }, testInfo) => {
+  const python = path.resolve('../backend', process.platform === 'win32' ? '.venv/Scripts/python.exe' : '.venv/bin/python');
+  const ffmpeg = execFileSync(python, ['-c', 'import imageio_ffmpeg; print(imageio_ffmpeg.get_ffmpeg_exe())']).toString().trim();
+  const fixture = testInfo.outputPath('my-neon.mp4');
+  execFileSync(ffmpeg, ['-v', 'error', '-f', 'lavfi', '-i', 'color=c=blue:size=160x240:rate=10', '-t', '4', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', fixture]);
+  const music = await (await request.post('http://127.0.0.1:8011/api/projects', { data: { name: 'Uploaded clips' } })).json();
+  const songs = await (await request.post(`http://127.0.0.1:8011/api/projects/${music.id}/tracks`, { multipart: { files: { name: 'A.wav', mimeType: 'audio/wav', buffer: wav() } } })).json();
+  const draft = await (await request.post('http://127.0.0.1:8011/api/studio/projects', { data: { title: 'Uploads', song_version_id: songs[0].latest_version_id } })).json();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`/studio/${draft.id}`);
+  await page.getByRole('button', { name: '4. Visuals', exact: true }).click();
+  await page.getByLabel('Video files').setInputFiles(fixture);
+  await page.getByRole('button', { name: 'Upload videos (1)', exact: true }).click();
+  await expect(page.getByText('1 clips added to Saved clips.')).toBeVisible();
+  const card = page.locator('.studio-media-grid article').first();
+  await card.scrollIntoViewIfNeeded();
+  await expect.poll(() => card.locator('video').evaluate((v: HTMLVideoElement) => v.videoWidth)).toBe(160);
+  await card.getByRole('button', { name: 'Edit clip details' }).click();
+  await card.getByLabel('Clip title').fill('My night footage');
+  await card.getByLabel('Clip tags').fill('blue, neon');
+  await card.getByRole('button', { name: 'Save clip details' }).click();
+  await page.getByLabel('Search saved clips').fill('NEON');
+  await page.getByRole('button', { name: 'Filter saved clips' }).click();
+  await expect(card).toContainText('My night footage');
+  await card.getByRole('button', { name: 'Select', exact: true }).click();
+  await page.getByRole('button', { name: 'Generate Draft (1 clips)' }).click();
+  await expect(page.getByLabel('Draft preview', { exact: true })).toHaveAttribute('src', /studio\/media\/\d+\/video/);
+  await page.reload();
+  await page.getByRole('button', { name: '4. Visuals', exact: true }).click();
+  await expect(page.getByLabel('Draft preview', { exact: true })).toHaveAttribute('src', /studio\/media\/\d+\/video/);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath('upload-mobile.png'), fullPage: true });
+});

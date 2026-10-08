@@ -269,3 +269,43 @@ class StudioTest(unittest.TestCase):
             hit['videos']['medium']['url'] = 'http://127.0.0.1/private'
             get.return_value = httpx.Response(200, json={'hits': [hit]}, request=reply.request)
             self.assertEqual(PixabayProvider().search('other'), [])
+
+    def test_uploaded_library_private_preview_tags_and_render(self):
+        import subprocess
+        from app.services.studio_storage import ffmpeg
+        fixture = Path(self.temp.name) / 'input.mp4'
+        subprocess.run([ffmpeg(), '-v', 'error', '-f', 'lavfi', '-i', 'color=c=blue:s=160x240:r=10',
+                        '-t', '4', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', str(fixture)], check=True)
+        response = self.client.post('/api/studio/media/upload', files={'file': ('Night.mp4', fixture.read_bytes(), 'video/mp4')})
+        self.assertEqual(response.status_code, 201, response.text)
+        item = response.json()
+        self.assertTrue(item['favorite'])
+        self.assertEqual(item['provider'], 'upload')
+        self.assertEqual(self.client.get(item['preview_url']).status_code, 200)
+        self.assertEqual(self.client.get(item['thumbnail']).status_code, 200)
+        self.assertEqual(self.public.get(item['preview_url']).status_code, 401)
+        self.assertEqual(self.other.get(item['preview_url']).status_code, 404)
+        self.assertEqual(self.other.get(item['thumbnail']).status_code, 404)
+        details = f"/api/studio/media/{item['id']}/details"
+        self.assertEqual(self.other.put(details, json={'title': 'Steal', 'tags': ''}).status_code, 404)
+        self.assertEqual(self.client.put(details, json={'title': 'Night drive', 'tags': 'blue, neon'}).status_code, 200)
+        self.assertEqual(len(self.client.get('/api/studio/media/favorites?q=NEON').json()), 1)
+        self.assertEqual(self.other.get('/api/studio/media/favorites?q=NEON').json(), [])
+        self.assertEqual(self.client.get('/api/studio/media/favorites?q=forest').json(), [])
+        self.edit(lyrics_text='')
+        self.assertEqual(self.client.post(self.url + '/draft', json={'media_ids': [item['id']]}).status_code, 200)
+        job = self.client.post(self.url + '/renders').json()
+        with patch('app.studio_worker.SessionLocal', self.sessions):
+            from app.studio_worker import process_one
+            self.assertTrue(process_one())
+        self.assertEqual(self.client.get(self.url + f"/renders/{job['id']}").json()['status'], 'completed')
+        self.assertEqual(self.client.get(self.url + f"/renders/{job['id']}/video").status_code, 200)
+
+    def test_upload_rejects_invalid_and_oversize_without_orphans(self):
+        for name, data, expected in [('bad.txt', b'bad', 422), ('bad.mp4', b'not video', 422)]:
+            response = self.client.post('/api/studio/media/upload', files={'file': (name, data, 'video/mp4')})
+            self.assertEqual(response.status_code, expected, response.text)
+        with patch.object(settings, 'max_upload_bytes', 2):
+            self.assertEqual(self.client.post('/api/studio/media/upload', files={'file': ('large.mp4', b'123', 'video/mp4')}).status_code, 413)
+        self.assertEqual(self.client.get('/api/studio/media/favorites').json(), [])
+        self.assertEqual(list((settings.content_dir / 'library').glob('*')), [])

@@ -59,6 +59,11 @@ class Favorite(Input):
     favorite: bool
 
 
+class MediaDetails(Input):
+    title: str = Field(max_length=200)
+    tags: str = Field(max_length=1000)
+
+
 class CollectionInput(Input):
     name: str = Field(min_length=1, max_length=100)
     base_aesthetic: str
