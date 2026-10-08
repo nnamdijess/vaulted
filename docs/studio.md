@@ -90,6 +90,8 @@ Pages: `/studio`, `/studio/new`, `/studio/[id]`. All APIs below use `/api/studio
 | GET/POST `/projects` | List/create drafts |
 | GET/PATCH/DELETE `/projects/{id}` | Read/edit/delete owned draft |
 | PUT `/projects/{id}/timings` | Validate and save line start times |
+| PUT `/projects/{id}/text-style` | Save validated color, font and alignment without resetting clips or timing |
+| GET `/fonts/{font_id}` | Serve bundled Studio fonts to authenticated users |
 | POST `/visuals/search` | Backend-only stock search |
 | GET `/media/favorites` | Saved owned stock selections |
 | PATCH `/media/{id}` | Favorite/unfavorite |
@@ -100,6 +102,16 @@ Pages: `/studio`, `/studio/new`, `/studio/[id]`. All APIs below use `/api/studio
 | GET `/projects/{id}/renders/{job_id}/video` | Private range-enabled preview; `?download=true` for download |
 
 ## Validation
+
+In Visuals, the Text style panel appears beside the draft on desktop and below it on phones.
+Color swatches, a custom color picker, Default/Abel/Anton/Lobster fonts and left/center/right
+alignment update the preview immediately. Save text style applies the settings to the whole
+draft; Cancel restores saved values. Unsaved previews are not included in exports.
+Existing drafts retain their preset appearance until customized. Startup adds the
+`content_projects.text_style` JSON column without resetting data. Export jobs snapshot the
+style, so editing a draft cannot change a previously queued export. Restart the backend and
+Studio worker after updating. Bundled fonts and licenses live in `backend/app/assets/studio-fonts`.
+Font file uploads and per-line styles are not part of this interface.
 
 Backend: `python -m unittest discover -s tests` from backend. Provider network requests are mocked; a short local synthetic clip exercises actual FFmpeg rendering. Frontend: `npm.cmd run lint`, `npm.cmd run typecheck`, `npm.cmd run build`, `npm.cmd run test:e2e`. Playwright uses isolated SQLite/upload/content directories and an empty provider key.
 

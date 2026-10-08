@@ -31,6 +31,12 @@ class Timing(Input):
     starts: list[float] = Field(max_length=200)
 
 
+class TextStyle(Input):
+    color: str = Field(pattern=r'^#[0-9a-fA-F]{6}$')
+    font: Literal['default', 'abel', 'anton', 'lobster']
+    align: Literal['left', 'center', 'right']
+
+
 class Search(Input):
     aesthetic: str = 'night-drive'
     query: str = Field(default='', max_length=100)

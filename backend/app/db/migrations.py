@@ -8,6 +8,10 @@ def upgrade_local_database(engine: Engine) -> None:
     with engine.begin() as connection:
         # Serialize startup upgrades when multiple local workers start together.
         connection.exec_driver_sql("BEGIN IMMEDIATE")
+        if inspect(connection).has_table('content_projects'):
+            columns = {c['name'] for c in inspect(connection).get_columns('content_projects')}
+            if 'text_style' not in columns:
+                connection.exec_driver_sql("ALTER TABLE content_projects ADD COLUMN text_style JSON NOT NULL DEFAULT '{}'")
         if inspect(connection).has_table('users'):
             user_columns = {c['name'] for c in inspect(connection).get_columns('users')}
             for name, definition in {'library_name': "VARCHAR(60) NOT NULL DEFAULT 'Vault'", 'accent_color': "VARCHAR(20) NOT NULL DEFAULT 'green'"}.items():

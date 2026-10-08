@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ContentProject } from '@/lib/studio';
 import { usePlayer } from '../audio-player';
 import { timestamp } from './section-selector';
+import { TextStyle, lyricCss, resolveTextStyle } from '@/lib/studio-text-style';
 
 type Clip = ContentProject['clips'][number];
 
@@ -31,8 +32,8 @@ function DraftVideo({ clip, time, playing, pause }: { clip: Clip; time: number; 
   </>;
 }
 
-export function DraftTimeline({ project, disabled, onReplace }: {
-  project: ContentProject; disabled: boolean; onReplace: (clip: Clip) => void;
+export function DraftTimeline({ project, disabled, onReplace, textStyle }: {
+  project: ContentProject; disabled: boolean; onReplace: (clip: Clip) => void; textStyle?: TextStyle;
 }) {
   const player = usePlayer();
   const [cursor, setCursor] = useState(0);
@@ -67,7 +68,7 @@ export function DraftTimeline({ project, disabled, onReplace }: {
     <h3>Your draft</h3>
     <div className={`studio-draft-preview lyric-${project.lyric_style}`}>
       <DraftVideo key={`${clip.id}:${clip.media.preview_url}`} clip={clip} time={time} playing={playing} pause={player.pause} />
-      <p>{line?.text}</p>
+      <p style={lyricCss(textStyle ?? resolveTextStyle(project.text_style, project.lyric_style))}>{line?.text}</p>
     </div>
     <div className="studio-actions">
       <button disabled={disabled} onClick={playing ? player.pause : play}>{playing ? 'Pause draft' : time >= length ? 'Replay draft' : 'Play draft'}</button>

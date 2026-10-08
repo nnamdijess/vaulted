@@ -104,6 +104,7 @@ class StudioTest(unittest.TestCase):
         from app.services.studio_renderer import command
         from app.services.studio_storage import content_path
         draft = self.draft()
+        self.assertEqual(self.client.put(self.url + '/text-style', json={'color': '#FF6BAE', 'font': 'lobster', 'align': 'left'}).status_code, 200)
         stock = content_path(f"projects/{draft['id']}/stock/{draft['clips'][0]['media_id']}.mp4")
         stock.parent.mkdir(parents=True, exist_ok=True)
         command(['-f', 'lavfi', '-i', 'color=c=blue:s=90x160:r=30:d=3', '-c:v', 'libx264', str(stock)], stock.parent)
@@ -125,6 +126,38 @@ class StudioTest(unittest.TestCase):
         self.assertTrue(safe_media_url('https://cdn.pixabay.com/video/a.mp4'))
         for url in ('http://cdn.pixabay.com/a', 'https://localhost/a', 'https://cdn.pixabay.com.evil.test/a', 'file:///tmp/a', 'https://user@cdn.pixabay.com/a'):
             self.assertFalse(safe_media_url(url))
+
+    def test_text_style_validation_ownership_snapshot_and_export(self):
+        from app.services.studio_renderer import subtitles
+        draft = self.draft()
+        style = {'color': '#12ABEF', 'font': 'anton', 'align': 'right'}
+        url = self.url + '/text-style'
+        self.assertEqual(self.public.put(url, json=style).status_code, 401)
+        self.assertEqual(self.other.put(url, json=style).status_code, 404)
+        for bad in ({'color': 'red'}, {'color': '#fff'}, {'font': '../secret'}, {'align': 'top'}, {'extra': True}):
+            self.assertEqual(self.client.put(url, json={**style, **bad}).status_code, 422)
+        saved = self.client.put(url, json=style).json()
+        self.assertEqual(saved['text_style'], style)
+        self.assertEqual(saved['clips'], draft['clips'])
+        self.assertEqual(saved['lines'], draft['lines'])
+        self.assertEqual(self.client.get(self.url).json()['text_style'], style)
+        exported = subtitles(saved)
+        self.assertIn('Default,Anton,48,&H00EFAB12', exported)
+        self.assertIn(',6,100,100,350,1', exported)
+        for align, expected in [('left', 4), ('center', 5), ('right', 6)]:
+            saved['text_style']['align'] = align
+            self.assertIn(f',{expected},100,100,350,1', subtitles(saved))
+        old = {**saved, 'text_style': {}, 'lyric_style': 'highlight'}
+        self.assertIn('&H0080FFFF', subtitles(old))
+        job = self.client.post(self.url + '/renders', json={}).json()
+        self.client.put(url, json={**style, 'font': 'lobster'})
+        with self.sessions() as db:
+            self.assertEqual(db.get(ContentRenderJob, job['id']).snapshot['text_style'], style)
+        for font in ('abel', 'anton', 'lobster'):
+            response = self.client.get(f'/api/studio/fonts/{font}')
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.content[:4], b'\x00\x01\x00\x00')
+        self.assertEqual(self.client.get('/api/studio/fonts/unknown').status_code, 404)
 
     def test_reusable_aesthetics_ownership_keywords_and_curated_generation(self):
         draft = self.draft()

@@ -42,6 +42,15 @@ test('draft timeline plays across sections, seeks and replaces only the selected
   await expect(section2).toHaveAttribute('aria-pressed', 'true');
   await expect(preview).toHaveAttribute('src', '/test-preview.mp4?clip=1');
   await expect(page.locator('.studio-draft-preview p')).toHaveText('Second lyric');
+  const textPanel = page.getByRole('complementary', { name: 'Text styling' });
+  await textPanel.getByRole('button', { name: 'Pink text' }).click();
+  await textPanel.getByRole('button', { name: 'Abel', exact: true }).click();
+  await textPanel.getByRole('button', { name: 'Align right' }).click();
+  await expect(page.locator('.studio-draft-preview p')).toHaveCSS('color', 'rgb(255, 107, 174)');
+  await expect(page.locator('.studio-draft-preview p')).toHaveCSS('text-align', 'right');
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.screenshot({ path: testInfo.outputPath('text-and-video-dark.png'), fullPage: true });
+  await textPanel.getByRole('button', { name: 'Cancel style changes' }).click();
   await section1.click();
   await page.getByRole('button', { name: 'Play draft', exact: true }).click();
   await expect(preview).toHaveJSProperty('paused', false);
@@ -56,7 +65,7 @@ test('draft timeline plays across sections, seeks and replaces only the selected
   await expect(position).toHaveValue('2.01');
   await section2.click();
   await page.getByRole('button', { name: 'Replace selected clip' }).click();
-  await expect(page.getByRole('status')).toContainText('section 2');
+  await expect(page.getByRole('status').filter({ hasText: 'Choose footage' })).toContainText('section 2');
   await page.getByRole('button', { name: 'Search footage', exact: true }).click();
   await page.getByRole('button', { name: 'Use replacement', exact: true }).click();
   await expect(preview).toHaveAttribute('src', replacement.preview_url);

@@ -4,6 +4,8 @@ import { api, postJson } from '@/lib/api';
 import { AestheticCollection, ContentProject, Media } from '@/lib/studio';
 import { DraftTimeline } from './draft-timeline';
 import { ClipPreview } from './clip-preview';
+import { TextStylePanel } from './text-style-panel';
+import { TextStyle, resolveTextStyle } from '@/lib/studio-text-style';
 
 export function Visuals({ project, setProject, disabled, pause, run }: { project: ContentProject; setProject: (project: ContentProject) => void; disabled: boolean; pause: () => void; run: (work: () => Promise<void>) => Promise<void> }) {
   const [results, setResults] = useState<Media[]>([]);
@@ -15,6 +17,9 @@ export function Visuals({ project, setProject, disabled, pause, run }: { project
   const [browsing, setBrowsing] = useState(false);
   const browser = useRef<HTMLDivElement>(null);
   const draft = useRef<HTMLDivElement>(null);
+  const [pendingStyle, setPendingStyle] = useState<TextStyle | null>(null);
+  const [styleSaved, setStyleSaved] = useState(false);
+  const textStyle = pendingStyle ?? resolveTextStyle(project.text_style, project.lyric_style);
   function closeBrowser() {
     pause(); setReplace(null); setBrowsing(false);
     requestAnimationFrame(() => {
@@ -44,7 +49,16 @@ export function Visuals({ project, setProject, disabled, pause, run }: { project
     requestAnimationFrame(() => { browser.current?.scrollIntoView({ block: 'start' }); browser.current?.querySelector('input')?.focus({ preventScroll: true }); });
   }
   return <section className="studio-panel"><h2>4. Visuals</h2><p>Stock footage from <a href="https://pixabay.com/" target="_blank" rel="noreferrer">Pixabay</a>. Landscape clips are center-cropped to vertical.</p>
-    {!!project.clips.length && <div ref={draft}><DraftTimeline project={project} disabled={disabled} onReplace={item => { setReplace(item.id); openBrowser(); }} /></div>}
+    <div className="studio-visual-layout">
+      {!!project.clips.length ? <div ref={draft}><DraftTimeline project={project} textStyle={textStyle} disabled={disabled} onReplace={item => { setReplace(item.id); openBrowser(); }} /></div>
+        : <div className="studio-empty-draft"><h3>Your draft</h3><p>Generate a draft or choose footage to preview your lyrics over video.</p></div>}
+      <TextStylePanel value={textStyle} dirty={pendingStyle !== null} disabled={disabled} saved={styleSaved}
+        onChange={value => { setPendingStyle(value); setStyleSaved(false); }} cancel={() => setPendingStyle(null)}
+        save={() => void run(async () => {
+          const updated = await api<ContentProject>(`/studio/projects/${project.id}/text-style`, { ...postJson(textStyle), method: 'PUT' });
+          setProject(updated); setPendingStyle(null); setStyleSaved(true);
+        })} />
+    </div>
     <div className="studio-actions"><button disabled={disabled} onClick={() => void run(() => generate('automatic'))}>{project.clips.length ? 'Regenerate draft' : 'Generate Immediately'}</button><button disabled={disabled} onClick={() => { openBrowser(); void run(review); }}>Review Media</button>
     {!!project.clips.length && <><button disabled={disabled} onClick={() => void run(() => generate('reroll'))}>Reroll Visuals</button><button disabled={disabled} onClick={() => void run(() => generate('order'))}>Reroll clip order</button></>}</div>
     <div ref={browser} hidden={!!project.clips.length && !browsing}>

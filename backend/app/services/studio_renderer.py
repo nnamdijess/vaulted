@@ -4,6 +4,7 @@ import subprocess
 from app.services.studio_storage import content_path, ffmpeg
 from app.services.storage import audio_path
 from app.services.visual_provider import download_video
+from app.services.studio_fonts import FONT_DIR, FONTS
 
 
 def ass_time(seconds):
@@ -14,8 +15,11 @@ def ass_time(seconds):
 def subtitles(snapshot):
     style = snapshot['lyric_style']
     size = 72 if style == 'large' else 48
-    alignment = 2 if style == 'lower' else 5
-    primary = '&H0080FFFF' if style == 'highlight' else '&H00FFFFFF'
+    custom = snapshot.get('text_style') or {}
+    alignment = (1 if style == 'lower' else 4) + {'left': 0, 'center': 1, 'right': 2}.get(custom.get('align'), 1)
+    color = custom.get('color', '#FFFF80' if style == 'highlight' else '#FFFFFF').lstrip('#')
+    primary = f'&H00{color[4:6]}{color[2:4]}{color[0:2]}'.upper()
+    font = FONTS.get(custom.get('font'), 'DejaVu Sans')
     header = f'''[Script Info]
 ScriptType: v4.00+
 PlayResX: 1080
@@ -23,7 +27,7 @@ PlayResY: 1920
 WrapStyle: 0
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,DejaVu Sans,{size},{primary},&H00FFFFFF,&H00101010,&H80000000,0,0,0,0,100,100,0,0,1,2,2,{alignment},100,100,350,1
+Style: Default,{font},{size},{primary},&H00FFFFFF,&H00101010,&H80000000,0,0,0,0,100,100,0,0,1,2,2,{alignment},100,100,350,1
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 '''
@@ -70,7 +74,8 @@ def render(job_id, snapshot, update_progress):
                 '-ss', str(snapshot['start_time']), '-protocol_whitelist', 'file,pipe', '-i', str(audio_path(snapshot['audio_path'])),
                 '-map', '0:v:0', '-map', '1:a:0', '-t', str(snapshot['end_time'] - snapshot['start_time'])]
         if snapshot['lines']:
-            args += ['-vf', 'subtitles=lyrics.ass']
+            shutil.copytree(FONT_DIR, work / 'fonts', dirs_exist_ok=True)
+            args += ['-vf', 'subtitles=lyrics.ass:fontsdir=fonts']
         args += ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '21', '-pix_fmt', 'yuv420p', '-threads', '2',
                  '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', 'export.mp4']
         command(args, work, timeout=900)

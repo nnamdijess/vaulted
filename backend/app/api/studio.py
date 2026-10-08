@@ -6,7 +6,8 @@ from sqlalchemy import select
 from app.api.music import Database, require_record, lock_track_order
 from app.models.music import Song, SongVersion, Project, utc_now
 from app.models.studio import ContentProject, ContentLyricLine, ContentMedia, ContentClip, ContentRenderJob, AestheticCollection
-from app.schemas.studio import Create, Edit, Timing, Search, Draft, Replace, Favorite, CollectionInput
+from app.schemas.studio import Create, Edit, Timing, Search, Draft, Replace, Favorite, CollectionInput, TextStyle
+from app.services.studio_fonts import FONT_DIR, FONTS
 from app.services.studio_presets import RECIPES, STYLES
 from app.services.studio_storage import duration, content_path
 from app.services.visual_provider import PixabayProvider
@@ -29,7 +30,7 @@ def view(project, db):
     version = require_record(db, SongVersion, project.song_version_id)
     song = version.song
     return {key: getattr(project, key) for key in ('id', 'title', 'song_id', 'song_version_id', 'status', 'start_time', 'end_time',
-             'lyrics_text', 'aesthetic', 'lyric_style', 'revision', 'created_at', 'updated_at')} | {
+             'lyrics_text', 'aesthetic', 'lyric_style', 'text_style', 'revision', 'created_at', 'updated_at')} | {
         'song_title': song.title, 'artist': song.artist or song.project.artist or song.project.owner_name,
         'project_id': song.project_id, 'cover_path': song.project.cover_path, 'version_name': version.version_name,
         'lines': [{'text': line.text, 'start_time': line.start_time, 'end_time': line.end_time} for line in project.lines],
@@ -101,6 +102,24 @@ def presets(db: Database):
                                {'id': f'custom:{item.id}', 'name': item.name, 'keywords': [{'query': q, 'weight': 1} for q in item.keywords]}
                                for item in db.scalars(select(AestheticCollection).where(AestheticCollection.owner_id == db.info['owner_id']))],
             'styles': [{'id': key, 'name': value} for key, value in STYLES.items()]}
+
+
+@router.get('/fonts/{font_id}')
+def font_file(font_id: str, db: Database):
+    if font_id not in FONTS:
+        raise HTTPException(404, 'Font not found')
+    return FileResponse(FONT_DIR / f'{FONTS[font_id]}-Regular.ttf', media_type='font/ttf',
+                        headers={'Cache-Control': 'private, max-age=86400'})
+
+
+@router.put('/projects/{identifier}/text-style')
+def edit_text_style(identifier: int, data: TextStyle, db: Database):
+    lock_track_order(db)
+    project = owned(db, ContentProject, identifier)
+    project.text_style = data.model_dump()
+    changed(project)
+    db.commit()
+    return view(project, db)
 
 
 @router.get('/songs')

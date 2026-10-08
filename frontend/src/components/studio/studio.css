@@ -1,4 +1,26 @@
 .studio-workspace { max-width: 1080px; margin: auto; padding-bottom: calc(160px + env(safe-area-inset-bottom)); }
+@font-face { font-family: 'Vaulted Abel'; src: url('/api/studio/fonts/abel') format('truetype'); font-display: swap; }
+@font-face { font-family: 'Vaulted Anton'; src: url('/api/studio/fonts/anton') format('truetype'); font-display: swap; }
+@font-face { font-family: 'Vaulted Lobster'; src: url('/api/studio/fonts/lobster') format('truetype'); font-display: swap; }
+.studio-visual-layout { display: grid; grid-template-columns: minmax(0, 1fr) 290px; gap: 28px; align-items: start; }
+.studio-visual-layout > div { min-width: 0; }
+.studio-text-panel { padding: 18px; border: 1px solid var(--line); border-radius: 16px; }
+.studio-text-panel h3 { margin-top: 0; }
+.studio-text-panel > p { color: var(--muted); font-size: 14px; }
+.studio-text-panel fieldset { border: 0; padding: 0; margin: 20px 0; min-width: 0; }
+.studio-text-panel legend { margin-bottom: 10px; font-weight: 600; }
+.studio-color-swatches { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.studio-color-swatch { padding: 6px; border-radius: 10px; }
+.studio-color-swatch span { display: block; width: 26px; height: 26px; margin: auto; border-radius: 50%; border: 1px solid #888; }
+.studio-text-panel button[aria-pressed='true'] { outline: 2px solid var(--accent); outline-offset: 1px; }
+.studio-font-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.studio-font-options button { padding: 10px; font-size: 19px; }
+.studio-alignment-options { display: flex; flex-wrap: wrap; gap: 6px; }
+.studio-alignment-options button { flex: 1; padding: 8px; font-size: 14px; }
+.studio-workspace .studio-text-panel .studio-custom-color { display: flex; align-items: center; justify-content: space-between; margin-top: 16px; }
+.studio-custom-color input[type='color'] { width: 48px; height: 44px; padding: 3px; }
+.studio-text-sample { padding: 16px; border-radius: 8px; background: #343434; font-size: 24px; overflow-wrap: anywhere; text-shadow: 0 1px 2px #000; }
+@media(max-width: 800px) { .studio-visual-layout { grid-template-columns: minmax(0, 1fr); } }
 .studio-heading { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin: 36px 0; flex-wrap: wrap; }
 .studio-panel { border: 1px solid var(--border, #555); border-radius: 20px; padding: 24px; margin: 24px 0; min-width: 0; }
 .studio-panel h2 { margin-top: 0; }

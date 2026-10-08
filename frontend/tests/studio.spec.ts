@@ -1,6 +1,42 @@
 import { expect } from '@playwright/test';
 import { test, wav } from './fixtures';
 
+test('Studio text panel previews, cancels and saves color font and alignment', async ({ page, request }, testInfo) => {
+  const music = await (await request.post('http://127.0.0.1:8011/api/projects', { data: { name: 'Text styles' } })).json();
+  const songs = await (await request.post(`http://127.0.0.1:8011/api/projects/${music.id}/tracks`, { multipart: { files: { name: 'Text.wav', mimeType: 'audio/wav', buffer: wav() } } })).json();
+  const draft = await (await request.post('http://127.0.0.1:8011/api/studio/projects', { data: { title: 'Style draft', song_version_id: songs[0].latest_version_id } })).json();
+  await page.goto(`/studio/${draft.id}`);
+  await page.getByRole('button', { name: '4. Visuals', exact: true }).click();
+  const panel = page.getByRole('complementary', { name: 'Text styling' });
+  const sample = page.getByLabel('Text style sample');
+  await panel.getByRole('button', { name: 'Pink text' }).click();
+  await panel.getByRole('button', { name: 'Anton', exact: true }).click();
+  await panel.getByRole('button', { name: 'Align right' }).click();
+  await expect(sample).toHaveCSS('color', 'rgb(255, 107, 174)');
+  await expect(sample).toHaveCSS('text-align', 'right');
+  await expect.poll(() => page.evaluate(async () => (await document.fonts.load('20px "Vaulted Anton"')).length)).toBe(1);
+  await panel.getByRole('button', { name: 'Cancel style changes' }).click();
+  await expect(sample).toHaveCSS('color', 'rgb(255, 255, 255)');
+  await panel.getByLabel('Custom text color').fill('#12abef');
+  await panel.getByRole('button', { name: 'Lobster', exact: true }).click();
+  await panel.getByRole('button', { name: 'Align left' }).click();
+  await panel.getByRole('button', { name: 'Save text style' }).click();
+  await expect(panel.getByRole('status')).toHaveText('Text style saved.');
+  const saved = await (await request.get(`http://127.0.0.1:8011/api/studio/projects/${draft.id}`)).json();
+  expect(saved.text_style).toEqual({ color: '#12abef', font: 'lobster', align: 'left' });
+  await page.reload();
+  await page.getByRole('button', { name: '4. Visuals', exact: true }).click();
+  await expect(panel.getByRole('button', { name: 'Lobster', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(sample).toHaveCSS('color', 'rgb(18, 171, 239)');
+  await expect(sample).toHaveCSS('text-align', 'left');
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.screenshot({ path: testInfo.outputPath('text-panel-desktop.png'), fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await panel.scrollIntoViewIfNeeded();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath('text-panel-mobile.png'), fullPage: true });
+});
+
 test('Studio mobile song, section, lyrics and private draft flow', async ({ page, request }) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
