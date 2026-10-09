@@ -15,7 +15,7 @@ export function TextStylePanel({ value, onChange, dirty, disabled, save, cancel,
       <label className="studio-custom-color">Custom text color<input type="color" value={value.color} onChange={event => onChange({ ...value, color: event.target.value })} /></label>
     </fieldset>
     <fieldset disabled={disabled}><legend>Font</legend><div className="studio-font-options">
-      {Object.entries(studioFonts).filter(([font]) => !['lobster', 'blackletter'].includes(font)).map(([font, family]) => <button type="button" className="secondary" key={font} style={{ fontFamily: family }}
+      {Object.entries(studioFonts).filter(([font]) => !['lobster', 'blackletter', 'dela', 'bowlby'].includes(font)).map(([font, family]) => <button type="button" className="secondary" key={font} style={{ fontFamily: family }}
         aria-pressed={value.font === font} onClick={() => onChange({ ...value, font: font as TextStyle['font'] })}>{font === 'default' ? 'Default' : family.replace('Vaulted ', '')}</button>)}
     </div></fieldset>
     <fieldset disabled={disabled}><legend>Formatting</legend><div className="studio-alignment-options">
