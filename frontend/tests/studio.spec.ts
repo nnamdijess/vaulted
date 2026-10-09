@@ -36,7 +36,7 @@ test('Studio text panel previews, cancels and saves color font and alignment', a
   await expect(panel.getByRole('button', { name: 'Anton', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(sample).toHaveCSS('color', 'rgb(18, 171, 239)');
   await expect(sample).toHaveCSS('text-align', 'left');
-  for (const [label, font] of [['Abel', 'abel'], ['Mono', 'mono']]) {
+  for (const [label, font] of [['Abel', 'abel'], ['Mono', 'mono'], ['Bebas Neue', 'bebas'], ['Dela Gothic One', 'dela'], ['Bowlby One SC', 'bowlby']]) {
     await panel.getByRole('button', { name: label, exact: true }).click();
     await expect.poll(() => page.evaluate(async family => (await document.fonts.load(`20px "Vaulted ${family}"`)).length, label)).toBe(1);
     await panel.getByRole('button', { name: 'Save text style' }).click();

@@ -16,7 +16,7 @@ export function TextStylePanel({ value, onChange, dirty, disabled, save, cancel,
     </fieldset>
     <fieldset disabled={disabled}><legend>Font</legend><div className="studio-font-options">
       {Object.entries(studioFonts).filter(([font]) => !['lobster', 'blackletter'].includes(font)).map(([font, family]) => <button type="button" className="secondary" key={font} style={{ fontFamily: family }}
-        aria-pressed={value.font === font} onClick={() => onChange({ ...value, font: font as TextStyle['font'] })}>{font === 'default' ? 'Default' : font[0].toUpperCase() + font.slice(1)}</button>)}
+        aria-pressed={value.font === font} onClick={() => onChange({ ...value, font: font as TextStyle['font'] })}>{font === 'default' ? 'Default' : family.replace('Vaulted ', '')}</button>)}
     </div></fieldset>
     <fieldset disabled={disabled}><legend>Alignment</legend><div className="studio-alignment-options">
       {(['left', 'center', 'right'] as const).map(align => <button type="button" key={align} className="secondary" aria-label={`Align ${align}`}

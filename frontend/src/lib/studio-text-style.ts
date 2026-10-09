@@ -1,7 +1,7 @@
 import type { CSSProperties } from 'react';
 
-export type TextStyle = { letter_spacing?: number; text_width?: number; color: string; font: 'default' | 'abel' | 'anton' | 'lobster' | 'blackletter' | 'mono'; align: 'left' | 'center' | 'right' };
-export const studioFonts = { default: 'sans-serif', abel: 'Vaulted Abel', anton: 'Vaulted Anton', lobster: 'Vaulted Lobster', blackletter: 'Vaulted Blackletter', mono: 'Vaulted Mono' };
+export type TextStyle = { letter_spacing?: number; text_width?: number; color: string; font: 'default' | 'abel' | 'anton' | 'lobster' | 'blackletter' | 'mono' | 'bebas' | 'dela' | 'bowlby'; align: 'left' | 'center' | 'right' };
+export const studioFonts = { default: 'sans-serif', abel: 'Vaulted Abel', anton: 'Vaulted Anton', lobster: 'Vaulted Lobster', blackletter: 'Vaulted Blackletter', mono: 'Vaulted Mono', bebas: 'Vaulted Bebas Neue', dela: 'Vaulted Dela Gothic One', bowlby: 'Vaulted Bowlby One SC' };
 export function resolveTextStyle(style: Partial<TextStyle> | undefined, preset: string): TextStyle {
   return { color: preset === 'highlight' ? '#FFFF80' : '#FFFFFF', font: 'default', align: 'center', ...style };
 }

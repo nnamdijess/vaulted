@@ -96,6 +96,8 @@ test('draft timeline plays across sections, seeks and replaces only the selected
 });
 
 
+test.describe('touch media previews', () => {
+test.use({ hasTouch: true });
 for (const format of ['mp4', 'gif']) {
 test(`uploaded ${format} clips can be previewed, tagged, filtered and used in a draft on mobile`, async ({ page, request }, testInfo) => {
   const python = path.resolve('../backend', process.platform === 'win32' ? '.venv/Scripts/python.exe' : '.venv/bin/python');
@@ -115,6 +117,11 @@ test(`uploaded ${format} clips can be previewed, tagged, filtered and used in a 
   const card = page.locator('.studio-media-grid article').first();
   await card.scrollIntoViewIfNeeded();
   await expect.poll(() => card.locator('video').evaluate((v: HTMLVideoElement) => v.videoWidth)).toBe(160);
+  await card.getByRole('button', { name: /^Play Preview/ }).tap();
+  await expect(card.locator('video')).toHaveJSProperty('paused', false);
+  await expect.poll(() => card.locator('video').evaluate((v: HTMLVideoElement) => v.currentTime)).toBeGreaterThan(0.1);
+  await card.getByRole('button', { name: /^Pause Preview/ }).tap();
+  await expect(card.locator('video')).toHaveJSProperty('paused', true);
   await card.getByRole('button', { name: 'Edit clip details' }).click();
   await card.getByLabel('Clip title').fill('My night footage');
   await card.getByLabel('Clip tags').fill('blue, neon');
@@ -156,3 +163,5 @@ test(`uploaded ${format} clips can be previewed, tagged, filtered and used in a 
 });
 
 }
+
+});

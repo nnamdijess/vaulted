@@ -116,3 +116,8 @@
   .studio-workspace button:not(:disabled):hover { background: var(--accent); color: var(--background) !important; border-color: var(--accent); }
 }
 .studio-workspace button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+.studio-preview-toggle { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin-top: 8px; }
+@font-face { font-family: 'Vaulted Bebas Neue'; src: url('/api/studio/fonts/bebas') format('truetype'); font-display: swap; }
+@font-face { font-family: 'Vaulted Dela Gothic One'; src: url('/api/studio/fonts/dela') format('truetype'); font-display: swap; }
+@font-face { font-family: 'Vaulted Bowlby One SC'; src: url('/api/studio/fonts/bowlby') format('truetype'); font-display: swap; }

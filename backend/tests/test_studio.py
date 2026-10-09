@@ -171,11 +171,11 @@ class StudioTest(unittest.TestCase):
         self.client.put(url, json={**style, 'font': 'lobster'})
         with self.sessions() as db:
             self.assertEqual(db.get(ContentRenderJob, job['id']).snapshot['text_style'], style)
-        for font in ('abel', 'anton', 'lobster', 'blackletter', 'mono'):
+        for font in ('abel', 'anton', 'lobster', 'blackletter', 'mono', 'bebas', 'dela', 'bowlby'):
             response = self.client.get(f'/api/studio/fonts/{font}')
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.content[:4], b'\x00\x01\x00\x00')
-        for font, family in [('blackletter', 'UnifrakturCook'), ('mono', 'Space Mono')]:
+        for font, family in [('blackletter', 'UnifrakturCook'), ('mono', 'Space Mono'), ('bebas', 'Bebas Neue'), ('dela', 'Dela Gothic One'), ('bowlby', 'Bowlby One SC')]:
             custom = self.client.put(url, json={**style, 'font': font}).json()
             self.assertIn(f'Default,{family},48', subtitles(custom))
         self.assertEqual(self.client.get('/api/studio/fonts/unknown').status_code, 404)
