@@ -163,3 +163,5 @@ Backend: `python -m unittest discover -s tests` from backend. Provider network r
 Manual live-provider smoke test after adding your key: choose a song, time two lyric lines, Review Media, preview and select enough clips, generate a draft, replace a clip, render with worker running, preview/download. Verify a different account cannot access the draft or export. Test at 390px and on your actual iPhone PWA (browser emulation does not fully represent iOS media behavior).
 
 Animated GIFs are converted to MP4 using one animation cycle (infinite loop flags are ignored). The resulting clips use the same private previews, tags, selections and export pipeline. MP4 does not preserve GIF transparency.
+
+Use **Select all shown** in the Visuals browser to add all current results (including filtered Saved clips) to your selection without duplicates. **Clear selection** resets it. Up to 1,000 clips can be selected; the draft uses selection order until the song section is filled, not every selected clip.

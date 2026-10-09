@@ -120,7 +120,12 @@ test(`uploaded ${format} clips can be previewed, tagged, filtered and used in a 
   await page.getByLabel('Search saved clips').fill('NEON');
   await page.getByRole('button', { name: 'Filter saved clips' }).click();
   await expect(card).toContainText('My night footage');
-  await card.getByRole('button', { name: 'Select', exact: true }).click();
+  await page.getByRole('button', { name: 'Select all shown', exact: true }).click();
+  await page.getByRole('button', { name: 'Select all shown', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'clips selected' })).toContainText('1 clips selected');
+  await page.getByRole('button', { name: 'Clear selection', exact: true }).click();
+  await expect(card.getByRole('button', { name: 'Select', exact: true })).toHaveAttribute('aria-pressed', 'false');
+  await page.getByRole('button', { name: 'Select all shown', exact: true }).click();
   await page.getByRole('button', { name: 'Generate Draft (1 clips)' }).click();
   await expect(page.getByLabel('Draft preview', { exact: true })).toHaveAttribute('src', /studio\/media\/\d+\/video/);
   await page.reload();

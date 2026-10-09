@@ -330,3 +330,16 @@ class StudioTest(unittest.TestCase):
             self.assertTrue(process_one())
         self.assertEqual(self.client.get(self.url + f"/renders/{job['id']}").json()['status'], 'completed')
         self.assertEqual(self.client.post('/api/studio/media/upload', files={'file': ('fake.gif', b'not a GIF', 'image/gif')}).status_code, 422)
+
+    def test_large_draft_selection_and_limit(self):
+        from app.models.studio import ContentMedia, ContentProject
+        with self.sessions() as db:
+            owner = db.get(ContentProject, self.project['id']).owner_id
+            media = [ContentMedia(owner_id=owner, provider='pixabay', provider_id=str(i), metadata_json=self.footage()[0]) for i in range(51)]
+            db.add_all(media); db.commit()
+            ids = [item.id for item in media]
+        response = self.client.post(self.url + '/draft', json={'media_ids': ids})
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()['clips'][0]['media_id'], ids[0])
+        self.assertEqual(self.other.post(self.url + '/draft', json={'media_ids': ids}).status_code, 404)
+        self.assertEqual(self.client.post(self.url + '/draft', json={'media_ids': ids * 20}).status_code, 422)

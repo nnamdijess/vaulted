@@ -47,7 +47,7 @@ class Search(Input):
 
 class Draft(Input):
     provider: Literal['pixabay', 'pexels'] = 'pixabay'
-    media_ids: list[int] = Field(default_factory=list, max_length=30)
+    media_ids: list[int] = Field(default_factory=list, max_length=1000)
     mode: Literal['selected', 'automatic', 'reroll', 'order'] = 'selected'
 
 

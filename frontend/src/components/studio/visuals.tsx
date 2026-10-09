@@ -36,7 +36,7 @@ export function Visuals({ project, setProject, disabled, pause, run }: { project
   }
   async function generate(mode: string) {
     pause();
-    setProject(await api<ContentProject>(`/studio/projects/${project.id}/draft`, postJson({ provider, mode, media_ids: selected })));
+    setProject(await api<ContentProject>(`/studio/projects/${project.id}/draft`, postJson({ provider, mode, media_ids: mode === 'selected' ? selected : [] })));
     setBrowsing(false); setReplace(null);
   }
   async function review() {
@@ -69,7 +69,15 @@ export function Visuals({ project, setProject, disabled, pause, run }: { project
     <form onSubmit={event => { event.preventDefault(); void run(() => search()); }}><label>Search visuals<input maxLength={100} value={query} onChange={event => setQuery(event.target.value)} placeholder="e.g. rain window" /></label><div className="studio-actions"><button disabled={disabled}>Search footage</button><button type="button" disabled={disabled} onClick={() => void run(async () => { setResults(await api<Media[]>('/studio/media/favorites')); setReviewed(true); })}>Saved clips</button><button type="button" disabled={disabled} onClick={() => void run(() => search(page % 10 + 1))}>Reroll results</button></div></form>
     {replace !== null && <p role="status">Choose footage below for section {project.clips.findIndex(item => item.id === replace) + 1}. Its timing will stay the same. <button onClick={closeBrowser}>Cancel replacement</button></p>}
     {reviewed && !results.length && <p>No clips found. Try another search.</p>}
-    <div className="studio-media-grid">{results.map(media => <article key={media.id}><ClipPreview key={media.preview_url} media={media} label={`Preview ${media.tags}`} onPlay={pause} /><small>{media.title || media.tags} · {media.duration.toFixed(1)}s</small><ClipDetails media={media} disabled={disabled} run={run} onSaved={updated => setResults(items => items.map(item => item.id === updated.id ? updated : item))} /><MediaCredit media={media} /><div className="studio-actions"><button disabled={disabled} aria-pressed={selected.includes(media.id)} onClick={() => {
+    {replace === null && <>
+      <p role="status">{selected.length} clips selected · Maximum 1,000. Drafts use clips in selection order until the section is full.</p>
+      <div className="studio-actions"><button disabled={disabled || !results.length || new Set([...selected, ...results.map(item => item.id)]).size > 1000}
+        onClick={() => setSelected(current => [...new Set([...current, ...results.map(item => item.id)])])}>Select all shown</button>
+        <button className="secondary" disabled={disabled || !selected.length} onClick={() => setSelected([])}>Clear selection</button>
+        {!!selected.length && <button disabled={disabled} onClick={() => void run(() => generate('selected'))}>Generate selected draft</button>}</div>
+      {!!results.length && new Set([...selected, ...results.map(item => item.id)]).size > 1000 && <p>These results exceed the 1,000-clip limit. Filter your saved clips or clear your selection first.</p>}
+    </>}
+    <div className="studio-media-grid">{results.map(media => <article key={media.id}><ClipPreview key={media.preview_url} media={media} label={`Preview ${media.tags}`} onPlay={pause} /><small>{media.title || media.tags} · {media.duration.toFixed(1)}s</small><ClipDetails media={media} disabled={disabled} run={run} onSaved={updated => setResults(items => items.map(item => item.id === updated.id ? updated : item))} /><MediaCredit media={media} /><div className="studio-actions"><button disabled={disabled || (replace === null && selected.length >= 1000 && !selected.includes(media.id))} aria-pressed={selected.includes(media.id)} onClick={() => {
       if (replace !== null) void run(async () => { setProject(await api<ContentProject>(`/studio/projects/${project.id}/clips/${replace}`, { ...postJson({ media_id: media.id }), method: 'PUT' })); closeBrowser(); });
       else setSelected(selected.includes(media.id) ? selected.filter(id => id !== media.id) : [...selected, media.id]);
     }}>{replace !== null ? 'Use replacement' : selected.includes(media.id) ? 'Deselect' : 'Select'}</button>{media.provider !== 'upload' && <button disabled={disabled} aria-pressed={media.favorite} onClick={() => void run(async () => { await api(`/studio/media/${media.id}`, { ...postJson({ favorite: !media.favorite }), method: 'PATCH' }); setResults(results.map(item => item.id === media.id ? { ...item, favorite: !item.favorite } : item)); })}>{media.favorite ? 'Unsave' : 'Save clip'}</button>}</div></article>)}</div>
