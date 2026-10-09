@@ -150,6 +150,19 @@ test('section window moves without resizing and unsaved lyric times preview at a
   await cdp.detach();
   await page.getByLabel('Start (seconds)', { exact: true }).fill('13');
   await page.getByLabel('End (seconds)', { exact: true }).fill('33');
+  const sectionAudio = page.getByTestId('global-audio');
+  await page.getByRole('button', { name: 'Last 3s', exact: true }).click();
+  await expect.poll(() => sectionAudio.evaluate((a: HTMLAudioElement) => a.currentTime)).toBeGreaterThanOrEqual(30);
+  await expect.poll(() => sectionAudio.evaluate((a: HTMLAudioElement) => a.currentTime)).toBeGreaterThanOrEqual(33);
+  await expect(sectionAudio).toHaveJSProperty('paused', true);
+  expect(await sectionAudio.evaluate((a: HTMLAudioElement) => a.currentTime)).toBeLessThan(33.3);
+  // A shorter unsaved selection previews its entirety, without starting before it.
+  await page.getByLabel('Start (seconds)', { exact: true }).fill('32');
+  await page.getByRole('button', { name: 'Last 3s', exact: true }).click();
+  await expect.poll(() => sectionAudio.evaluate((a: HTMLAudioElement) => a.currentTime)).toBeGreaterThanOrEqual(32);
+  await expect.poll(() => sectionAudio.evaluate((a: HTMLAudioElement) => a.currentTime)).toBeGreaterThanOrEqual(33);
+  await expect(sectionAudio).toHaveJSProperty('paused', true);
+  await page.getByLabel('Start (seconds)', { exact: true }).fill('13');
   await page.getByRole('button', { name: 'Save section', exact: true }).click();
   await page.getByRole('button', { name: '2. Lyrics', exact: true }).click();
   await page.getByLabel('Lyrics', { exact: true }).fill('First unsaved line\nSecond unsaved line');
