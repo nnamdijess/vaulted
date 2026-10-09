@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from 'react';
+import { Dispatch, SetStateAction, useEffect, useRef, useState } from 'react';
 import { api, postJson } from '@/lib/api';
 import { ContentProject, Media } from '@/lib/studio';
 import { ClipLibraryTools, ClipDetails } from './clip-library';
@@ -9,9 +9,8 @@ import { ClipPreview } from './clip-preview';
 import { TextStylePanel } from './text-style-panel';
 import { TextStyle, resolveTextStyle } from '@/lib/studio-text-style';
 
-export function Visuals({ project, setProject, disabled, pause, run }: { project: ContentProject; setProject: (project: ContentProject) => void; disabled: boolean; pause: () => void; run: (work: () => Promise<void>) => Promise<void> }) {
+export function Visuals({ project, setProject, disabled, pause, run, pendingStyle, setPendingStyle, selected, setSelected }: { pendingStyle: TextStyle | null; setPendingStyle: Dispatch<SetStateAction<TextStyle | null>>; selected: number[]; setSelected: Dispatch<SetStateAction<number[] | null>>; project: ContentProject; setProject: (project: ContentProject) => void; disabled: boolean; pause: () => void; run: (work: () => Promise<void>) => Promise<void> }) {
   const [results, setResults] = useState<Media[]>([]);
-  const [selected, setSelected] = useState<number[]>(project.media_pool ?? []);
   const [librarySource, setLibrarySource] = useState('all');
   const [libraryError, setLibraryError] = useState('');
   const [tab, setTab] = useState<'library' | 'upload' | 'search'>('library');
@@ -23,7 +22,6 @@ export function Visuals({ project, setProject, disabled, pause, run }: { project
   const [browsing, setBrowsing] = useState(false);
   const browser = useRef<HTMLDivElement>(null);
   const draft = useRef<HTMLDivElement>(null);
-  const [pendingStyle, setPendingStyle] = useState<TextStyle | null>(null);
   const [styleSaved, setStyleSaved] = useState(false);
   useEffect(() => {
     if (tab !== 'library') return;
@@ -101,8 +99,8 @@ export function Visuals({ project, setProject, disabled, pause, run }: { project
     {reviewed && !shown.length && <p>No clips found. Try another search.</p>}
     {replace === null && <>
       <p role="status">{selected.length} clips selected · Maximum 1,000. Drafts randomly choose from this pool until the section is full.</p>
-      <div className="studio-actions"><button disabled={disabled || !shown.length || new Set([...selected, ...shown.map(item => item.id)]).size > 1000}
-        onClick={() => setSelected(current => [...new Set([...current, ...shown.map(item => item.id)])])}>Select all shown</button>
+      <div className="studio-actions"><button aria-pressed={shown.length > 0 && shown.every(item => selected.includes(item.id))} disabled={disabled || !shown.length || new Set([...selected, ...shown.map(item => item.id)]).size > 1000}
+        onClick={() => setSelected(current => [...new Set([...(current ?? []), ...shown.map(item => item.id)])])}>Select all shown</button>
         <button className="secondary" disabled={disabled || !selected.length} onClick={() => setSelected([])}>Clear selection</button>
         {!!selected.length && <button disabled={disabled} onClick={() => void run(() => generate('selected'))}>Generate selected draft</button>}</div>
       {!!shown.length && new Set([...selected, ...shown.map(item => item.id)]).size > 1000 && <p>These results exceed the 1,000-clip limit. Filter your saved clips or clear your selection first.</p>}

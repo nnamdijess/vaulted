@@ -125,6 +125,7 @@ test(`uploaded ${format} clips can be previewed, tagged, filtered and used in a 
   await page.getByRole('button', { name: 'Filter saved clips' }).click();
   await expect(card).toContainText('My night footage');
   await page.getByRole('button', { name: 'Select all shown', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Select all shown', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('button', { name: 'Select all shown', exact: true }).click();
   await expect(page.getByRole('status').filter({ hasText: 'clips selected' })).toContainText('1 clips selected');
   await page.getByRole('button', { name: 'Clear selection', exact: true }).click();

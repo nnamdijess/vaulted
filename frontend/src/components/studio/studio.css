@@ -106,3 +106,13 @@
 .studio-visuals h3 { letter-spacing: -.02em; }
 .studio-visuals > p { max-width: 65ch; color: var(--muted); line-height: 1.6; }
 @media(max-width: 500px) { .studio-visuals .studio-media-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } }
+
+/* Neutral Studio tools with persistent selection and hover accents. */
+.studio-workspace .studio-panel button { background: var(--background); color: var(--text) !important; border: 1px solid var(--line); }
+.studio-workspace .studio-media-tabs button { background: #111; color: #eee !important; }
+.studio-workspace .studio-panel button[aria-pressed='true'],
+.studio-workspace .studio-panel button[aria-selected='true'] { background: var(--accent); color: var(--background) !important; border-color: var(--accent); }
+@media (hover: hover) {
+  .studio-workspace button:not(:disabled):hover { background: var(--accent); color: var(--background) !important; border-color: var(--accent); }
+}
+.studio-workspace button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }

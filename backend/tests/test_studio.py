@@ -54,6 +54,24 @@ class StudioTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200, response.text)
         return response.json()
 
+    def test_lyric_and_sync_edits_preserve_visuals(self):
+        draft = self.draft()
+        style = {'font': 'anton', 'color': '#FF9F43', 'align': 'right', 'letter_spacing': 0.1, 'text_width': 60}
+        self.assertEqual(self.client.put(self.url + '/text-style', json=style).status_code, 200)
+        updated = self.edit(lyrics_text='Edited line\nSecond line').json()
+        self.assertEqual(updated['clips'], draft['clips'])
+        self.assertEqual(updated['text_style'], style)
+        synced = self.client.put(self.url + '/timings', json={'starts': [0, 1.5]}).json()
+        self.assertEqual(synced['clips'], draft['clips'])
+        self.assertEqual(synced['text_style'], style)
+        reloaded = self.client.get(self.url).json()
+        self.assertEqual(reloaded['text_style'], style)
+        self.assertEqual(reloaded['clips'], draft['clips'])
+        changed = self.edit(end_time=2).json()
+        self.assertEqual(changed['clips'], [])
+        self.assertTrue(all(line['start_time'] is None for line in changed['lines']))
+        self.assertEqual(changed['text_style'], style)
+
     def test_ownership_sections_lyrics_and_presets(self):
         self.assertEqual(self.public.get(self.url).status_code, 401)
         self.assertEqual(self.other.get(self.url).status_code, 404)

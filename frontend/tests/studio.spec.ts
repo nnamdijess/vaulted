@@ -18,20 +18,25 @@ test('Studio text panel previews, cancels and saves color font and alignment', a
   await panel.getByRole('button', { name: 'Cancel style changes' }).click();
   await expect(sample).toHaveCSS('color', 'rgb(255, 255, 255)');
   await panel.getByLabel('Custom text color').fill('#12abef');
-  await panel.getByRole('button', { name: 'Lobster', exact: true }).click();
+  await panel.getByRole('button', { name: 'Anton', exact: true }).click();
   await panel.getByRole('button', { name: 'Align left' }).click();
   await panel.getByLabel('Letter spacing').fill('0.1');
   await panel.getByLabel('Text width').fill('60');
+  await page.getByRole('button', { name: '2. Lyrics', exact: true }).click();
+  await page.getByRole('button', { name: 'Save draft', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Draft saved' })).toBeVisible();
+  await page.getByRole('button', { name: '4. Visuals', exact: true }).click();
+  await expect(panel.getByRole('button', { name: 'Align left' })).toHaveAttribute('aria-pressed', 'true');
   await panel.getByRole('button', { name: 'Save text style' }).click();
   await expect(panel.getByRole('status')).toHaveText('Text style saved.');
   const saved = await (await request.get(`http://127.0.0.1:8011/api/studio/projects/${draft.id}`)).json();
-  expect(saved.text_style).toEqual({ color: '#12abef', font: 'lobster', align: 'left', letter_spacing: 0.1, text_width: 60 });
+  expect(saved.text_style).toEqual({ color: '#12abef', font: 'anton', align: 'left', letter_spacing: 0.1, text_width: 60 });
   await page.reload();
   await page.getByRole('button', { name: '4. Visuals', exact: true }).click();
-  await expect(panel.getByRole('button', { name: 'Lobster', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(panel.getByRole('button', { name: 'Anton', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(sample).toHaveCSS('color', 'rgb(18, 171, 239)');
   await expect(sample).toHaveCSS('text-align', 'left');
-  for (const [label, font] of [['Blackletter', 'blackletter'], ['Mono', 'mono']]) {
+  for (const [label, font] of [['Abel', 'abel'], ['Mono', 'mono']]) {
     await panel.getByRole('button', { name: label, exact: true }).click();
     await expect.poll(() => page.evaluate(async family => (await document.fonts.load(`20px "Vaulted ${family}"`)).length, label)).toBe(1);
     await panel.getByRole('button', { name: 'Save text style' }).click();
@@ -61,7 +66,7 @@ test('Studio mobile song, section, lyrics and private draft flow', async ({ page
   await page.getByRole('link', { name: 'Create New' }).click();
   await page.getByRole('combobox', { name: 'Version', exact: true }).selectOption(String(songs[0].latest_version_id));
   await expect(page.getByRole('heading', { name: 'Studio tune', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: '2. Lyrics & look', exact: true }).click();
+  await page.getByRole('button', { name: '2. Lyrics', exact: true }).click();
   await page.getByLabel('Lyrics', { exact: true }).fill('First line\nSecond line');
   await page.getByRole('button', { name: 'Save draft', exact: true }).click();
   await page.getByRole('button', { name: '3. Sync', exact: true }).click();
@@ -93,7 +98,7 @@ test('Studio mobile song, section, lyrics and private draft flow', async ({ page
   const insights = await (await request.get(`http://127.0.0.1:8011/api/projects/${music.id}/insights`)).json();
   expect(insights.total).toBe(0);
   await page.getByRole('button', { name: '1. Section', exact: true }).click();
-  const inactiveStep = page.getByRole('button', { name: '2. Lyrics & look', exact: true });
+  const inactiveStep = page.getByRole('button', { name: '2. Lyrics', exact: true });
   expect(await inactiveStep.evaluate(element => getComputedStyle(element).color)).not.toBe(await page.locator('.theme-scope').evaluate(element => getComputedStyle(element).backgroundColor));
   await page.screenshot({ path: 'test-results/studio-mobile.png', fullPage: true });
   await page.setViewportSize({ width: 1280, height: 900 });
@@ -136,7 +141,7 @@ test('section window moves without resizing and unsaved lyric times preview at a
   await page.getByLabel('Start (seconds)', { exact: true }).fill('13');
   await page.getByLabel('End (seconds)', { exact: true }).fill('33');
   await page.getByRole('button', { name: 'Save section', exact: true }).click();
-  await page.getByRole('button', { name: '2. Lyrics & look', exact: true }).click();
+  await page.getByRole('button', { name: '2. Lyrics', exact: true }).click();
   await page.getByLabel('Lyrics', { exact: true }).fill('First unsaved line\nSecond unsaved line');
   await page.getByRole('button', { name: 'Save draft', exact: true }).click();
   await page.getByRole('button', { name: '3. Sync', exact: true }).click();
@@ -158,7 +163,7 @@ test('custom aesthetic names and keywords persist across drafts without changing
   const songs = await (await request.post(`http://127.0.0.1:8011/api/projects/${music.id}/tracks`, { multipart: { files: { name: 'A.wav', mimeType: 'audio/wav', buffer: wav() } } })).json();
   const draft = await (await request.post('http://127.0.0.1:8011/api/studio/projects', { data: { title: 'Collection draft', song_version_id: songs[0].latest_version_id } })).json();
   await page.goto(`/studio/${draft.id}`);
-  await page.getByRole('button', { name: '2. Lyrics & look', exact: true }).click();
+  await page.getByRole('button', { name: '2. Lyrics', exact: true }).click();
   await page.getByRole('button', { name: 'Customize aesthetic', exact: true }).click();
   await page.getByLabel('Collection name', { exact: true }).fill('Late night');
   await page.getByRole('textbox', { name: 'Search keywords (one per line)', exact: true }).fill('rain window\nmoonlight');
@@ -166,7 +171,7 @@ test('custom aesthetic names and keywords persist across drafts without changing
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.getByRole('button', { name: 'Save draft', exact: true }).click();
   await page.reload();
-  await page.getByRole('button', { name: '2. Lyrics & look', exact: true }).click();
+  await page.getByRole('button', { name: '2. Lyrics', exact: true }).click();
   await expect(page.getByRole('combobox', { name: 'Aesthetic', exact: true })).toContainText('Late night');
   await page.getByRole('button', { name: 'Edit aesthetic collection', exact: true }).click();
   await expect(page.getByRole('textbox', { name: 'Search keywords (one per line)', exact: true })).toHaveValue('rain window\nmoonlight');
