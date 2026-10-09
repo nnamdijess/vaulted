@@ -1,4 +1,5 @@
 "use client";
+import { BrandMark } from "@/components/brand-mark";
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -10,7 +11,7 @@ import { StudioEditor } from './editor';
 import './studio.css';
 
 export function Studio({ create = false, identifier }: { create?: boolean; identifier?: string }) {
-  return <PrivateArea><main className="studio-workspace"><header><Link href="/projects" className="brand">vaulted<span className="dot">.</span></Link><AccountArea /></header><WorkspaceNav studio />
+  return <PrivateArea><main className="studio-workspace"><header><Link href="/projects" className="brand"><BrandMark /></Link><AccountArea /></header><WorkspaceNav studio />
     {identifier ? <StudioEditor identifier={identifier} /> : create ? <SongPicker /> : <Dashboard />}
   </main></PrivateArea>;
 }

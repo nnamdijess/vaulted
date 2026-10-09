@@ -1,4 +1,5 @@
 "use client";
+import { BrandMark } from "@/components/brand-mark";
 import Link from 'next/link';
 import { FormEvent, useEffect, useState } from 'react';
 import { AccountArea, LogoutButton, PrivateArea, useAuth, User } from './auth-provider';
@@ -11,7 +12,7 @@ export function Profile() { return <PrivateArea><ProfileContent /></PrivateArea>
 function ProfileContent() {
   const { user, setUser } = useAuth();
   const [editing, setEditing] = useState(false);
-  return <main><header><Link href="/projects" className="brand">vaulted<span className="dot">.</span></Link><AccountArea /></header>
+  return <main><header><Link href="/projects" className="brand"><BrandMark /></Link><AccountArea /></header>
     <nav><Link href="/projects">Back to {user?.library_name ?? 'Vault'}</Link></nav><section className="profile-panel"><h1>Your profile</h1>
     <ProfilePictureMenu onEdit={() => setEditing(true)}>{user?.avatar_path ?
       // eslint-disable-next-line @next/next/no-img-element -- authenticated local image

@@ -287,3 +287,5 @@ button, a, input[type="range"] { touch-action: manipulation; }
 .workspace-nav { display: flex; gap: 24px; margin: 20px 0; }
 .workspace-nav a { padding: 10px 0; }
 .workspace-nav a[aria-current="page"] { color: var(--accent); border-bottom: 2px solid currentColor; }
+
+.brand-mark { display: block; width: 52px; height: 52px; border-radius: 10px; object-fit: contain; }

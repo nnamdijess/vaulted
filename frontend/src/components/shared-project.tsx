@@ -1,4 +1,5 @@
 "use client";
+import { BrandMark } from "@/components/brand-mark";
 import { PlayerIcon } from "./player-icon";
 import { useEffect, useState } from 'react';
 import { QueueTrack, usePlayer } from './audio-player';
@@ -20,7 +21,7 @@ export function SharedProjectView({ token }: { token: string }) {
     return () => { active = false; };
   }, [base]);
   const queue: QueueTrack[] = project?.tracks.filter((song) => song.playable).map((song) => ({ songId: song.id, title: song.title, artist: song.artist || project.artist || project.owner_name, versionName: song.version_name, versionId: song.version_id, publicToken: token, coverUrl: project.has_cover ? `${base}/cover` : undefined })) ?? [];
-  return <main><header><span className="brand">vaulted<span className="dot">.</span></span><ThemeSwitch /></header>
+  return <main><header><span className="brand"><BrandMark /></span><ThemeSwitch /></header>
     {error ? <p className="error" role="alert">{error}</p> : !project ? <p>Loading shared project…</p> : <>
       <section className="album-header"><div className="album-cover">{project.has_cover
         // eslint-disable-next-line @next/next/no-img-element
