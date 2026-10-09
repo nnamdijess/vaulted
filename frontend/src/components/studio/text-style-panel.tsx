@@ -22,6 +22,11 @@ export function TextStylePanel({ value, onChange, dirty, disabled, save, cancel,
       {(['left', 'center', 'right'] as const).map(align => <button type="button" key={align} className="secondary" aria-label={`Align ${align}`}
         aria-pressed={value.align === align} onClick={() => onChange({ ...value, align })}>{align[0].toUpperCase() + align.slice(1)}</button>)}
     </div></fieldset>
+    <fieldset disabled={disabled}><legend>Spacing</legend>
+      <label>Letter spacing<input type="range" min="0" max="0.3" step="0.01" value={value.letter_spacing ?? 0} onChange={event => onChange({ ...value, letter_spacing: Number(event.target.value) })} /></label>
+      <label>Text width<input type="range" min="40" max="90" step="1" value={value.text_width ?? 82} onChange={event => onChange({ ...value, text_width: Number(event.target.value) })} /></label>
+      <small>Narrow the text area for shorter lines and more space around your lyrics.</small>
+    </fieldset>
     <div className="studio-text-sample" style={lyricCss(value)} aria-label="Text style sample">Your lyrics, your style</div>
     <div className="studio-actions"><button disabled={disabled || !dirty} onClick={save}>Save text style</button>
       {dirty && <button className="secondary" disabled={disabled} onClick={cancel}>Cancel style changes</button>}

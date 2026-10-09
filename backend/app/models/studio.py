@@ -19,6 +19,7 @@ class ContentProject(Base):
     lyrics_text: Mapped[str] = mapped_column(Text, default='')
     aesthetic: Mapped[str] = mapped_column(String(40), default='night-drive')
     lyric_style: Mapped[str] = mapped_column(String(40), default='minimal')
+    media_pool: Mapped[list] = mapped_column(JSON, default=list)
     text_style: Mapped[dict] = mapped_column(JSON, default=dict)
     revision: Mapped[int] = mapped_column(default=1)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)

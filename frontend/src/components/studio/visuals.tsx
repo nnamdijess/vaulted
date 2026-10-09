@@ -1,7 +1,7 @@
 "use client";
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api, postJson } from '@/lib/api';
-import { AestheticCollection, ContentProject, Media } from '@/lib/studio';
+import { ContentProject, Media } from '@/lib/studio';
 import { ClipLibraryTools, ClipDetails } from './clip-library';
 import { DraftTimeline } from './draft-timeline';
 import { MediaCredit, ProviderSelect } from './media-provider';
@@ -11,7 +11,10 @@ import { TextStyle, resolveTextStyle } from '@/lib/studio-text-style';
 
 export function Visuals({ project, setProject, disabled, pause, run }: { project: ContentProject; setProject: (project: ContentProject) => void; disabled: boolean; pause: () => void; run: (work: () => Promise<void>) => Promise<void> }) {
   const [results, setResults] = useState<Media[]>([]);
-  const [selected, setSelected] = useState<number[]>([]);
+  const [selected, setSelected] = useState<number[]>(project.media_pool ?? []);
+  const [librarySource, setLibrarySource] = useState('all');
+  const [libraryError, setLibraryError] = useState('');
+  const [tab, setTab] = useState<'library' | 'upload' | 'search'>('library');
   const [provider, setProvider] = useState<'pixabay' | 'pexels'>('pixabay');
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(1);
@@ -22,6 +25,12 @@ export function Visuals({ project, setProject, disabled, pause, run }: { project
   const draft = useRef<HTMLDivElement>(null);
   const [pendingStyle, setPendingStyle] = useState<TextStyle | null>(null);
   const [styleSaved, setStyleSaved] = useState(false);
+  useEffect(() => {
+    if (tab !== 'library') return;
+    let active = true;
+    void api<Media[]>('/studio/media/favorites').then(items => { if (active) { setResults(items); setReviewed(true); } }).catch(error => { if (active) setLibraryError(error.message); });
+    return () => { active = false; };
+  }, [tab]);
   const textStyle = pendingStyle ?? resolveTextStyle(project.text_style, project.lyric_style);
   function closeBrowser() {
     pause(); setReplace(null); setBrowsing(false);
@@ -36,23 +45,27 @@ export function Visuals({ project, setProject, disabled, pause, run }: { project
   }
   async function generate(mode: string) {
     pause();
-    setProject(await api<ContentProject>(`/studio/projects/${project.id}/draft`, postJson({ provider, mode, media_ids: mode === 'selected' ? selected : [] })));
+    const requestMode = mode === 'reroll' && selected.length ? 'selected' : mode;
+    const updated = await api<ContentProject>(`/studio/projects/${project.id}/draft`, postJson({ provider, mode: requestMode, media_ids: requestMode === 'selected' ? selected : [] }));
+    setProject(updated); setSelected(updated.media_pool ?? []);
     setBrowsing(false); setReplace(null);
   }
   async function review() {
-    if (project.aesthetic.startsWith('custom:')) {
-      const collections = await api<AestheticCollection[]>('/studio/aesthetics');
-      const collection = collections.find(item => `custom:${item.id}` === project.aesthetic);
-      if (collection?.media.length) { setResults(collection.media); setReviewed(true); return; }
-    }
-    await search();
+    setTab('library');
+    setResults(await api<Media[]>('/studio/media/favorites')); setReviewed(true);
+  }
+  function switchTab(value: 'library' | 'upload' | 'search') {
+    if (value === tab) return;
+    setLibraryError(''); setTab(value); setResults([]); setReviewed(false);
+
   }
   function openBrowser() {
     setBrowsing(true);
     requestAnimationFrame(() => { browser.current?.scrollIntoView({ block: 'start' }); browser.current?.querySelector('input')?.focus({ preventScroll: true }); });
   }
-  return <section className="studio-panel"><h2>4. Visuals</h2><p>Stock footage from <a href="https://pixabay.com/" target="_blank" rel="noreferrer">Pixabay</a> and <a href="https://www.pexels.com/" target="_blank" rel="noreferrer">Pexels</a>. Landscape clips are center-cropped to vertical.</p>
-    <ProviderSelect value={provider} disabled={disabled} onChange={value => { setProvider(value); setResults([]); setSelected([]); setReviewed(false); setPage(1); }} /><div className="studio-visual-layout">
+  const shown = tab === 'library' ? results.filter(item => librarySource === 'all' || (librarySource === 'upload' ? item.provider === 'upload' : item.provider !== 'upload')) : results;
+  return <section className="studio-panel studio-visuals"><h2>4. Visuals</h2><p>Build with your clips, or discover footage from <a href="https://pixabay.com/" target="_blank" rel="noreferrer">Pixabay</a> and <a href="https://www.pexels.com/" target="_blank" rel="noreferrer">Pexels</a>. Landscape clips are center-cropped to vertical.</p>
+    <div className="studio-visual-layout">
       {!!project.clips.length ? <div ref={draft}><DraftTimeline project={project} textStyle={textStyle} disabled={disabled} onReplace={item => { setReplace(item.id); openBrowser(); }} /></div>
         : <div className="studio-empty-draft"><h3>Your draft</h3><p>Generate a draft or choose footage to preview your lyrics over video.</p></div>}
       <TextStylePanel value={textStyle} dirty={pendingStyle !== null} disabled={disabled} saved={styleSaved}
@@ -62,26 +75,43 @@ export function Visuals({ project, setProject, disabled, pause, run }: { project
           setProject(updated); setPendingStyle(null); setStyleSaved(true);
         })} />
     </div>
-    <div className="studio-actions"><button disabled={disabled} onClick={() => void run(() => generate('automatic'))}>{project.clips.length ? 'Regenerate draft' : 'Generate Immediately'}</button><button disabled={disabled} onClick={() => { openBrowser(); void run(review); }}>Review Media</button>
-    {!!project.clips.length && <><button disabled={disabled} onClick={() => void run(() => generate('reroll'))}>Reroll Visuals</button><button disabled={disabled} onClick={() => void run(() => generate('order'))}>Reroll clip order</button></>}</div>
+    <div className="studio-actions"><button disabled={disabled} onClick={() => { openBrowser(); void run(review); }}>Review Media</button>
+    {(!!project.clips.length || !!project.media_pool?.length) && <button disabled={disabled} onClick={() => void run(() => generate('reroll'))}>Reroll Visuals</button>}
+    {!!project.clips.length && <><button disabled={disabled} onClick={() => void run(() => generate('order'))}>Reroll clip order</button>
+      <button disabled={disabled} onClick={() => void run(async () => { pause(); setProject(await api<ContentProject>(`/studio/projects/${project.id}/clips`, { method: 'DELETE' })); })}>Clear draft visuals</button></>}
+    </div>
+    {!!project.media_pool?.length && <p>Rerolls use your {project.media_pool.length} chosen clips, preferring footage not in the current draft. Your library stays unchanged.</p>}
     <div ref={browser} hidden={!!project.clips.length && !browsing}>
-    <ClipLibraryTools disabled={disabled} run={run} onResults={items => { setResults(items); setReviewed(true); }} />
-    <form onSubmit={event => { event.preventDefault(); void run(() => search()); }}><label>Search visuals<input maxLength={100} value={query} onChange={event => setQuery(event.target.value)} placeholder="e.g. rain window" /></label><div className="studio-actions"><button disabled={disabled}>Search footage</button><button type="button" disabled={disabled} onClick={() => void run(async () => { setResults(await api<Media[]>('/studio/media/favorites')); setReviewed(true); })}>Saved clips</button><button type="button" disabled={disabled} onClick={() => void run(() => search(page % 10 + 1))}>Reroll results</button></div></form>
+    <div className="studio-media-tabs" role="tablist" aria-label="Media source">
+      {(['library', 'upload', 'search'] as const).map((value, index, values) => <button key={value} role="tab" id={`media-tab-${value}`} aria-controls={`media-panel-${value}`} aria-selected={tab === value} tabIndex={tab === value ? 0 : -1} disabled={disabled}
+        onClick={() => switchTab(value)} onKeyDown={event => {
+          const next = event.key === 'ArrowRight' ? values[(index + 1) % 3] : event.key === 'ArrowLeft' ? values[(index + 2) % 3] : event.key === 'Home' ? values[0] : event.key === 'End' ? values[2] : null;
+          if (next) { event.preventDefault(); switchTab(next); document.getElementById(`media-tab-${next}`)?.focus(); }
+        }}>{value === 'library' ? 'My clips' : value === 'upload' ? 'Upload media' : 'Search'}</button>)}
+    </div>
+    <div role="tabpanel" id={`media-panel-${tab}`} aria-labelledby={`media-tab-${tab}`}>
+    {tab !== 'search' && <ClipLibraryTools mode={tab === 'upload' ? 'upload' : 'library'} disabled={disabled} run={run} onResults={items => { setResults(items); setReviewed(true); }} />}
+    {libraryError && <p role="alert">{libraryError}</p>}
+    {tab === 'library' && <label>Clip source<select aria-label="Clip source" value={librarySource} onChange={event => setLibrarySource(event.target.value)}><option value="all">Uploaded and saved</option><option value="upload">My uploads only</option><option value="stock">Saved stock only</option></select></label>}
+    {tab === 'search' && <>
+      <ProviderSelect value={provider} disabled={disabled} onChange={value => { setProvider(value); setResults([]); setReviewed(false); setPage(1); }} />
+      <form onSubmit={event => { event.preventDefault(); void run(() => search()); }}><label>Search visuals<input maxLength={100} value={query} onChange={event => setQuery(event.target.value)} placeholder="e.g. neon street, abstract texture" /></label><div className="studio-actions"><button disabled={disabled}>Search footage</button><button type="button" disabled={disabled} onClick={() => void run(() => search(page % 10 + 1))}>New stock results</button><button type="button" disabled={disabled} onClick={() => void run(() => generate('automatic'))}>Generate from stock</button></div></form>
+    </>}
     {replace !== null && <p role="status">Choose footage below for section {project.clips.findIndex(item => item.id === replace) + 1}. Its timing will stay the same. <button onClick={closeBrowser}>Cancel replacement</button></p>}
-    {reviewed && !results.length && <p>No clips found. Try another search.</p>}
+    {reviewed && !shown.length && <p>No clips found. Try another search.</p>}
     {replace === null && <>
-      <p role="status">{selected.length} clips selected · Maximum 1,000. Drafts use clips in selection order until the section is full.</p>
-      <div className="studio-actions"><button disabled={disabled || !results.length || new Set([...selected, ...results.map(item => item.id)]).size > 1000}
-        onClick={() => setSelected(current => [...new Set([...current, ...results.map(item => item.id)])])}>Select all shown</button>
+      <p role="status">{selected.length} clips selected · Maximum 1,000. Drafts randomly choose from this pool until the section is full.</p>
+      <div className="studio-actions"><button disabled={disabled || !shown.length || new Set([...selected, ...shown.map(item => item.id)]).size > 1000}
+        onClick={() => setSelected(current => [...new Set([...current, ...shown.map(item => item.id)])])}>Select all shown</button>
         <button className="secondary" disabled={disabled || !selected.length} onClick={() => setSelected([])}>Clear selection</button>
         {!!selected.length && <button disabled={disabled} onClick={() => void run(() => generate('selected'))}>Generate selected draft</button>}</div>
-      {!!results.length && new Set([...selected, ...results.map(item => item.id)]).size > 1000 && <p>These results exceed the 1,000-clip limit. Filter your saved clips or clear your selection first.</p>}
+      {!!shown.length && new Set([...selected, ...shown.map(item => item.id)]).size > 1000 && <p>These results exceed the 1,000-clip limit. Filter your saved clips or clear your selection first.</p>}
     </>}
-    <div className="studio-media-grid">{results.map(media => <article key={media.id}><ClipPreview key={media.preview_url} media={media} label={`Preview ${media.tags}`} onPlay={pause} /><small>{media.title || media.tags} · {media.duration.toFixed(1)}s</small><ClipDetails media={media} disabled={disabled} run={run} onSaved={updated => setResults(items => items.map(item => item.id === updated.id ? updated : item))} /><MediaCredit media={media} /><div className="studio-actions"><button disabled={disabled || (replace === null && selected.length >= 1000 && !selected.includes(media.id))} aria-pressed={selected.includes(media.id)} onClick={() => {
+    <div className="studio-media-grid">{shown.map(media => <article key={media.id}><ClipPreview key={media.preview_url} media={media} label={`Preview ${media.tags}`} onPlay={pause} /><small>{media.title || media.tags} · {media.duration.toFixed(1)}s</small><ClipDetails media={media} disabled={disabled} run={run} onSaved={updated => setResults(items => items.map(item => item.id === updated.id ? updated : item))} /><MediaCredit media={media} /><div className="studio-actions"><button disabled={disabled || (replace === null && selected.length >= 1000 && !selected.includes(media.id))} aria-pressed={selected.includes(media.id)} onClick={() => {
       if (replace !== null) void run(async () => { setProject(await api<ContentProject>(`/studio/projects/${project.id}/clips/${replace}`, { ...postJson({ media_id: media.id }), method: 'PUT' })); closeBrowser(); });
       else setSelected(selected.includes(media.id) ? selected.filter(id => id !== media.id) : [...selected, media.id]);
     }}>{replace !== null ? 'Use replacement' : selected.includes(media.id) ? 'Deselect' : 'Select'}</button>{media.provider !== 'upload' && <button disabled={disabled} aria-pressed={media.favorite} onClick={() => void run(async () => { await api(`/studio/media/${media.id}`, { ...postJson({ favorite: !media.favorite }), method: 'PATCH' }); setResults(results.map(item => item.id === media.id ? { ...item, favorite: !item.favorite } : item)); })}>{media.favorite ? 'Unsave' : 'Save clip'}</button>}</div></article>)}</div>
     {!!selected.length && <button disabled={disabled} onClick={() => void run(() => generate('selected'))}>Generate Draft ({selected.length} clips)</button>}
-    </div>
+    </div></div>
   </section>;
 }

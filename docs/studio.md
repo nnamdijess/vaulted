@@ -164,4 +164,23 @@ Manual live-provider smoke test after adding your key: choose a song, time two l
 
 Animated GIFs are converted to MP4 using one animation cycle (infinite loop flags are ignored). The resulting clips use the same private previews, tags, selections and export pipeline. MP4 does not preserve GIF transparency.
 
-Use **Select all shown** in the Visuals browser to add all current results (including filtered Saved clips) to your selection without duplicates. **Clear selection** resets it. Up to 1,000 clips can be selected; the draft uses selection order until the song section is filled, not every selected clip.
+Use **Select all shown** in the Visuals browser to add all current results (including filtered Saved clips) to your selection without duplicates. **Clear selection** resets it. Up to 1,000 clips can be selected; the draft randomly draws from the saved selection until the song section is filled, not every selected clip.
+
+### Media tabs and rerolling your library
+
+Visuals opens on **My clips**, with an uploaded/saved-stock filter and saved-clip search.
+**Upload media** holds uploads; **Search** holds provider search, new stock results and
+explicit stock generation. Neutral tool buttons reduce accent clutter; the active media
+source tab uses your account accent. Previous/Next are neutral arrow controls.
+
+Selecting clips and generating stores the complete pool in `content_projects.media_pool`
+(JSON, added safely on startup). Generation shuffles candidates and prefers clips absent
+from the current sequence. Reroll Visuals reuses that pool across reloads, without provider
+requests. If insufficient unused footage exists it reuses previous clips; a one-clip pool
+cannot produce different footage. Clear draft visuals removes only the sequence and keeps
+the pool, lyrics, library and previous exports. Explicit Generate from stock replaces the
+selected pool with provider/collection generation. Existing stock drafts retain stock rerolls.
+
+Text styling now includes letter spacing (0–0.3 em) and text-area width (40–90%). Save text
+style persists them and snapshots them into export jobs; ASS letter spacing and side margins
+apply the same settings to exports. Browser and FFmpeg font wrapping can differ slightly.

@@ -5,13 +5,13 @@ import { Media } from '@/lib/studio';
 
 type Runner = (work: () => Promise<void>) => Promise<void>;
 
-export function ClipLibraryTools({ disabled, run, onResults }: { disabled: boolean; run: Runner; onResults: (items: Media[]) => void }) {
+export function ClipLibraryTools({ disabled, run, onResults, mode = 'upload' }: { mode?: 'upload' | 'library'; disabled: boolean; run: Runner; onResults: (items: Media[]) => void }) {
   const [files, setFiles] = useState<File[]>([]);
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState('');
   return <section aria-label="Your clip library">
-    <h3>Your clip library</h3>
-    <form onSubmit={event => { event.preventDefault(); void run(async () => {
+    <h3>{mode === 'upload' ? 'Upload media' : 'Find your clips'}</h3>
+    <form hidden={mode !== 'upload'} onSubmit={event => { event.preventDefault(); void run(async () => {
       const uploaded: Media[] = [];
       try {
         for (const file of files) {
@@ -31,7 +31,7 @@ export function ClipLibraryTools({ disabled, run, onResults }: { disabled: boole
       <button disabled={disabled || !files.length}>Upload videos{files.length ? ` (${files.length})` : ''}</button>
       <p role="status">{status}</p>
     </form>
-    <form onSubmit={event => { event.preventDefault(); void run(async () => onResults(await api<Media[]>(`/studio/media/favorites?q=${encodeURIComponent(query)}`))); }}>
+    <form hidden={mode !== 'library'} onSubmit={event => { event.preventDefault(); void run(async () => onResults(await api<Media[]>(`/studio/media/favorites?q=${encodeURIComponent(query)}`))); }}>
       <label>Search saved clips<input value={query} maxLength={100} onChange={event => setQuery(event.target.value)} placeholder="Title or tag, e.g. neon" /></label>
       <button disabled={disabled}>Filter saved clips</button>
     </form>

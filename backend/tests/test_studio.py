@@ -130,7 +130,7 @@ class StudioTest(unittest.TestCase):
     def test_text_style_validation_ownership_snapshot_and_export(self):
         from app.services.studio_renderer import subtitles
         draft = self.draft()
-        style = {'color': '#12ABEF', 'font': 'anton', 'align': 'right'}
+        style = {'color': '#12ABEF', 'font': 'anton', 'align': 'right', 'letter_spacing': 0.1, 'text_width': 60}
         url = self.url + '/text-style'
         self.assertEqual(self.public.put(url, json=style).status_code, 401)
         self.assertEqual(self.other.put(url, json=style).status_code, 404)
@@ -143,10 +143,10 @@ class StudioTest(unittest.TestCase):
         self.assertEqual(self.client.get(self.url).json()['text_style'], style)
         exported = subtitles(saved)
         self.assertIn('Default,Anton,48,&H00EFAB12', exported)
-        self.assertIn(',6,100,100,350,1', exported)
+        self.assertIn(',6,216,216,350,1', exported)
         for align, expected in [('left', 4), ('center', 5), ('right', 6)]:
             saved['text_style']['align'] = align
-            self.assertIn(f',{expected},100,100,350,1', subtitles(saved))
+            self.assertIn(f',{expected},216,216,350,1', subtitles(saved))
         old = {**saved, 'text_style': {}, 'lyric_style': 'highlight'}
         self.assertIn('&H0080FFFF', subtitles(old))
         job = self.client.post(self.url + '/renders', json={}).json()
@@ -340,6 +340,35 @@ class StudioTest(unittest.TestCase):
             ids = [item.id for item in media]
         response = self.client.post(self.url + '/draft', json={'media_ids': ids})
         self.assertEqual(response.status_code, 200, response.text)
-        self.assertEqual(response.json()['clips'][0]['media_id'], ids[0])
+        self.assertIn(response.json()['clips'][0]['media_id'], ids)
         self.assertEqual(self.other.post(self.url + '/draft', json={'media_ids': ids}).status_code, 404)
         self.assertEqual(self.client.post(self.url + '/draft', json={'media_ids': ids * 20}).status_code, 422)
+
+    def test_selected_pool_rerolls_without_provider_and_clear_preserves_pool(self):
+        from app.models.studio import ContentMedia, ContentProject
+        with self.sessions() as db:
+            owner = db.get(ContentProject, self.project['id']).owner_id
+            items = [ContentMedia(owner_id=owner, provider='upload', provider_id=str(i), metadata_json=self.footage()[0]) for i in range(8)]
+            db.add_all(items); db.commit()
+            ids = [item.id for item in items]
+        with patch('app.api.studio.PixabayProvider.search', side_effect=AssertionError('No stock search')):
+            first = self.client.post(self.url + '/draft', json={'media_ids': ids}).json()
+            self.assertEqual(first['media_pool'], ids)
+            second = self.client.post(self.url + '/draft', json={'mode': 'reroll'}).json()
+            self.assertNotEqual(first['clips'][0]['media_id'], second['clips'][0]['media_id'])
+            self.assertEqual(self.client.get(self.url).json()['media_pool'], ids)
+            self.assertEqual(self.other.delete(self.url + '/clips').status_code, 404)
+            cleared = self.client.delete(self.url + '/clips').json()
+            self.assertEqual(cleared['clips'], [])
+            self.assertEqual(cleared['media_pool'], ids)
+            self.assertEqual(self.client.post(self.url + '/draft', json={'mode': 'reroll'}).status_code, 200)
+
+    def test_media_pool_migration_is_additive_and_repeatable(self):
+        from app.db.migrations import upgrade_local_database
+        with self.engine.begin() as connection:
+            connection.exec_driver_sql('ALTER TABLE content_projects DROP COLUMN media_pool')
+        upgrade_local_database(self.engine)
+        upgrade_local_database(self.engine)
+        restored = self.client.get(self.url).json()
+        self.assertEqual(restored['media_pool'], [])
+        self.assertEqual(restored['title'], self.project['title'])

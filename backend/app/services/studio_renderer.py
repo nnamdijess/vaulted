@@ -20,6 +20,8 @@ def subtitles(snapshot):
     color = custom.get('color', '#FFFF80' if style == 'highlight' else '#FFFFFF').lstrip('#')
     primary = f'&H00{color[4:6]}{color[2:4]}{color[0:2]}'.upper()
     font = FONTS.get(custom.get('font'), 'DejaVu Sans')
+    spacing = custom.get('letter_spacing', 0) * size
+    margin = round(1080 * (100 - custom.get('text_width', 82)) / 200)
     header = f'''[Script Info]
 ScriptType: v4.00+
 PlayResX: 1080
@@ -27,7 +29,7 @@ PlayResY: 1920
 WrapStyle: 0
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,{font},{size},{primary},&H00FFFFFF,&H00101010,&H80000000,0,0,0,0,100,100,0,0,1,2,2,{alignment},100,100,350,1
+Style: Default,{font},{size},{primary},&H00FFFFFF,&H00101010,&H80000000,0,0,0,0,100,100,{spacing},0,1,2,2,{alignment},{margin},{margin},350,1
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 '''

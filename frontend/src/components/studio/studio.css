@@ -89,3 +89,20 @@
 .studio-selected-section p { overflow-wrap: anywhere; color: var(--muted); margin: 8px 0; }
 .studio-video-error { position: absolute; inset: 0; padding: 24px; display: grid; align-content: center; gap: 16px; background: var(--background); }
 @media (max-width: 500px) { .studio-panel { padding: 16px; } .studio-media-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } .studio-media-grid article { padding: 8px; } .studio-media-grid button { width: 100%; padding: 8px; } .studio-fields { gap: 10px; } .studio-heading { gap: 16px; } .studio-heading h1 { font-size: 28px; overflow-wrap: anywhere; } }
+
+/* Neutral tools keep the active source tab as the primary accent. */
+.studio-workspace .studio-step-navigation button,
+.studio-visuals button { background: var(--background); color: var(--text) !important; border: 1px solid var(--line); }
+.studio-step-navigation { justify-content: space-between; margin: 28px 0; }
+.studio-step-navigation button { display: inline-flex; gap: 14px; align-items: center; }
+.studio-media-tabs { display: flex; gap: 4px; padding: 6px; background: #111; border-radius: 14px; margin: 28px 0; }
+.studio-media-tabs button { flex: 1; border: 0; border-radius: 9px; background: transparent; color: #eee !important; padding: 12px 8px; }
+.studio-media-tabs button[aria-selected='true'] { background: var(--accent); color: var(--background) !important; }
+.studio-visuals .studio-media-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 16px; }
+.studio-visuals .studio-media-grid video { aspect-ratio: 9/16; }
+.studio-visuals .studio-media-grid button { padding: 8px 12px; font-size: 14px; }
+.studio-visuals .studio-media-grid button[aria-pressed='true'] { border-color: var(--accent); outline: 1px solid var(--accent); }
+.studio-visuals form[hidden] { display: none; }
+.studio-visuals h3 { letter-spacing: -.02em; }
+.studio-visuals > p { max-width: 65ch; color: var(--muted); line-height: 1.6; }
+@media(max-width: 500px) { .studio-visuals .studio-media-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } }

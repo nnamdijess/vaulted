@@ -32,6 +32,8 @@ class Timing(Input):
 
 
 class TextStyle(Input):
+    letter_spacing: float = Field(default=0, ge=0, le=0.3)
+    text_width: int = Field(default=82, ge=40, le=90)
     color: str = Field(pattern=r'^#[0-9a-fA-F]{6}$')
     font: Literal['default', 'abel', 'anton', 'lobster', 'blackletter', 'mono']
     align: Literal['left', 'center', 'right']

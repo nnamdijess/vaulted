@@ -20,10 +20,12 @@ test('Studio text panel previews, cancels and saves color font and alignment', a
   await panel.getByLabel('Custom text color').fill('#12abef');
   await panel.getByRole('button', { name: 'Lobster', exact: true }).click();
   await panel.getByRole('button', { name: 'Align left' }).click();
+  await panel.getByLabel('Letter spacing').fill('0.1');
+  await panel.getByLabel('Text width').fill('60');
   await panel.getByRole('button', { name: 'Save text style' }).click();
   await expect(panel.getByRole('status')).toHaveText('Text style saved.');
   const saved = await (await request.get(`http://127.0.0.1:8011/api/studio/projects/${draft.id}`)).json();
-  expect(saved.text_style).toEqual({ color: '#12abef', font: 'lobster', align: 'left' });
+  expect(saved.text_style).toEqual({ color: '#12abef', font: 'lobster', align: 'left', letter_spacing: 0.1, text_width: 60 });
   await page.reload();
   await page.getByRole('button', { name: '4. Visuals', exact: true }).click();
   await expect(panel.getByRole('button', { name: 'Lobster', exact: true })).toHaveAttribute('aria-pressed', 'true');
@@ -76,9 +78,12 @@ test('Studio mobile song, section, lyrics and private draft flow', async ({ page
   await expect(page.getByLabel('Line 2 start', { exact: true })).toHaveValue('1.2');
   await page.getByRole('button', { name: '4. Visuals', exact: true }).click();
   await page.getByRole('button', { name: 'Review Media', exact: true }).click();
+  await expect(page.getByRole('tab', { name: 'My clips' })).toHaveAttribute('aria-selected', 'true');
+  await page.getByRole('tab', { name: 'Search', exact: true }).click();
+  await page.getByRole('button', { name: 'Search footage', exact: true }).click();
   await expect(page.getByRole('alert').filter({ hasText: 'PIXABAY_API_KEY' })).toBeVisible();
   await page.getByLabel('Footage source').selectOption('pexels');
-  await page.getByRole('button', { name: 'Review Media', exact: true }).click();
+  await page.getByRole('button', { name: 'Search footage', exact: true }).click();
   await expect(page.getByRole('alert').filter({ hasText: 'PEXELS_API_KEY' })).toBeVisible();
   expect(errors).toEqual([]);
   const endpoint = page.url().match(/\/studio\/(\d+)/)![1];

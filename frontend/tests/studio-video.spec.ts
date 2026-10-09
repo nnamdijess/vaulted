@@ -69,6 +69,7 @@ test('draft timeline plays across sections, seeks and replaces only the selected
   await section2.click();
   await page.getByRole('button', { name: 'Replace selected clip' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Choose footage' })).toContainText('section 2');
+  await page.getByRole('tab', { name: 'Search', exact: true }).click();
   await page.getByLabel('Footage source').selectOption('pexels');
   await page.getByRole('button', { name: 'Search footage', exact: true }).click();
   await expect(page.getByRole('link', { name: 'Video by Test creator on Pexels' })).toBeVisible();
@@ -107,6 +108,7 @@ test(`uploaded ${format} clips can be previewed, tagged, filtered and used in a 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`/studio/${draft.id}`);
   await page.getByRole('button', { name: '4. Visuals', exact: true }).click();
+  await page.getByRole('tab', { name: 'Upload media', exact: true }).click();
   await page.getByLabel('Video files').setInputFiles(fixture);
   await page.getByRole('button', { name: 'Upload videos (1)', exact: true }).click();
   await expect(page.getByText('1 clips added to Saved clips.')).toBeVisible();
@@ -117,6 +119,8 @@ test(`uploaded ${format} clips can be previewed, tagged, filtered and used in a 
   await card.getByLabel('Clip title').fill('My night footage');
   await card.getByLabel('Clip tags').fill('blue, neon');
   await card.getByRole('button', { name: 'Save clip details' }).click();
+  await page.getByRole('tab', { name: 'My clips', exact: true }).click();
+  await page.getByLabel('Clip source', { exact: true }).selectOption('upload');
   await page.getByLabel('Search saved clips').fill('NEON');
   await page.getByRole('button', { name: 'Filter saved clips' }).click();
   await expect(card).toContainText('My night footage');
@@ -132,7 +136,22 @@ test(`uploaded ${format} clips can be previewed, tagged, filtered and used in a 
   await page.getByRole('button', { name: '4. Visuals', exact: true }).click();
   await expect(page.getByLabel('Draft preview', { exact: true })).toHaveAttribute('src', /studio\/media\/\d+\/video/);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.getByRole('button', { name: 'Clear draft visuals', exact: true }).click();
+  await expect(page.getByLabel('Draft preview', { exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Reroll Visuals', exact: true }).click();
+  await expect(page.getByLabel('Draft preview', { exact: true })).toHaveAttribute('src', /studio\/media\/\d+\/video/);
+  await page.getByRole('button', { name: 'Review Media', exact: true }).click();
+  const reviewButton = page.getByRole('button', { name: 'Review Media', exact: true });
+  expect(await reviewButton.evaluate(el => getComputedStyle(el).color)).not.toBe(await reviewButton.evaluate(el => getComputedStyle(el).backgroundColor));
+  const myClips = page.getByRole('tab', { name: 'My clips', exact: true });
+  await myClips.focus(); await page.keyboard.press('ArrowRight');
+  await expect(page.getByRole('tab', { name: 'Upload media' })).toHaveAttribute('aria-selected', 'true');
+  await page.keyboard.press('ArrowLeft');
+  await expect(myClips).toHaveAttribute('aria-selected', 'true');
   await page.screenshot({ path: testInfo.outputPath('upload-mobile.png'), fullPage: true });
+  await page.emulateMedia({ colorScheme: 'dark' });
+  expect(await reviewButton.evaluate(el => getComputedStyle(el).color)).not.toBe(await reviewButton.evaluate(el => getComputedStyle(el).backgroundColor));
+  await page.screenshot({ path: testInfo.outputPath('upload-dark.png'), fullPage: true });
 });
 
 }

@@ -32,7 +32,7 @@ def view(project, db):
     version = require_record(db, SongVersion, project.song_version_id)
     song = version.song
     return {key: getattr(project, key) for key in ('id', 'title', 'song_id', 'song_version_id', 'status', 'start_time', 'end_time',
-             'lyrics_text', 'aesthetic', 'lyric_style', 'text_style', 'revision', 'created_at', 'updated_at')} | {
+             'lyrics_text', 'aesthetic', 'lyric_style', 'media_pool', 'text_style', 'revision', 'created_at', 'updated_at')} | {
         'song_title': song.title, 'artist': song.artist or song.project.artist or song.project.owner_name,
         'project_id': song.project_id, 'cover_path': song.project.cover_path, 'version_name': version.version_name,
         'lines': [{'text': line.text, 'start_time': line.start_time, 'end_time': line.end_time} for line in project.lines],
@@ -304,7 +304,18 @@ def favorite(identifier: int, data: Favorite, db: Database):
 def draft(identifier: int, data: Draft, db: Database):
     project = owned(db, ContentProject, identifier)
     ids = data.media_ids
-    if data.mode in ('automatic', 'reroll'):
+    if data.mode == 'selected' or (data.mode == 'reroll' and project.media_pool):
+        ids = list(dict.fromkeys(data.media_ids if data.mode == 'selected' else project.media_pool))
+        for value in ids:
+            owned(db, ContentMedia, value)
+        project.media_pool = ids.copy()
+        old = {clip.media_id for clip in project.clips}
+        fresh = [value for value in ids if value not in old]
+        previous = [value for value in ids if value in old]
+        random.shuffle(fresh)
+        random.shuffle(previous)
+        ids = fresh + previous
+    elif data.mode in ('automatic', 'reroll'):
         collection = collection_for(db, project.aesthetic)
         results = [{'id': identifier} for identifier in collection.media_ids] if collection and collection.media_ids else search_media(Search(aesthetic=project.aesthetic, provider=data.provider, count=30, page=random.randint(1, 3) if data.mode == 'reroll' else 1), db)
         old = {clip.media_id for clip in project.clips}
@@ -314,6 +325,7 @@ def draft(identifier: int, data: Draft, db: Database):
         random.shuffle(previous)
         # Prefer new clips, but keep enough curated footage to fill the section.
         ids.extend(previous)
+        project.media_pool = []
     elif data.mode == 'order':
         ids = list(dict.fromkeys(clip.media_id for clip in project.clips))
         random.shuffle(ids)
@@ -334,6 +346,16 @@ def draft(identifier: int, data: Draft, db: Database):
     project.status = 'ready'
     db.commit()
     db.refresh(project)
+    return view(project, db)
+
+
+@router.delete('/projects/{identifier}/clips')
+def clear_clips(identifier: int, db: Database):
+    lock_track_order(db)
+    project = owned(db, ContentProject, identifier)
+    project.clips.clear()
+    changed(project)
+    db.commit()
     return view(project, db)
 
 
