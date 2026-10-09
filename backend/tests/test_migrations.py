@@ -20,9 +20,12 @@ class MigrationTest(unittest.TestCase):
                 connection.exec_driver_sql("INSERT INTO song_versions VALUES (1, 1, 'v1', 'existing.wav', 'demo.wav', 'Version notes', '2026-01-01')")
                 connection.exec_driver_sql("CREATE TABLE content_projects (id INTEGER PRIMARY KEY, title TEXT)")
                 connection.exec_driver_sql("INSERT INTO content_projects VALUES (1, 'Existing Studio draft')")
+                connection.exec_driver_sql("CREATE TABLE IF NOT EXISTS content_clips (id INTEGER PRIMARY KEY, source_start REAL)")
+                connection.exec_driver_sql("INSERT INTO content_clips VALUES (1, 0.5)")
             upgrade_local_database(engine)
             upgrade_local_database(engine)
             with engine.connect() as connection:
+                self.assertEqual(connection.execute(text("SELECT source_start, framing FROM content_clips")).one(), (0.5, '{}'))
                 self.assertEqual(connection.execute(text("SELECT title, text_style FROM content_projects")).one(), ('Existing Studio draft', '{}'))
                 self.assertEqual(connection.execute(text("SELECT cover_path, notes, share_token, sharing_enabled, allow_downloads FROM projects")).one(), (None, '', None, 0, 0))
                 self.assertEqual(connection.execute(text("SELECT id, position FROM songs ORDER BY position")).all(), [(2, 1), (1, 2)])

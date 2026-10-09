@@ -7,6 +7,7 @@ import { AccountArea, PrivateArea } from '../auth-provider';
 import { WorkspaceNav } from '../workspace-nav';
 import { api, postJson } from '@/lib/api';
 import { ContentProject, StudioSong } from '@/lib/studio';
+import { RenderActions } from './render-actions';
 import { StudioEditor } from './editor';
 import './studio.css';
 
@@ -26,7 +27,7 @@ function Dashboard() {
     <h2>Recent Content Projects</h2><div className="studio-cards">{projects.slice(0, 6).map(project => <Link className="studio-card" key={project.id} href={`/studio/${project.id}`}><Cover project={project} /><strong>{project.title}</strong><span>{project.song_title} · {project.status}</span></Link>)}</div>
     {!loading && !projects.length && <p>Your first video starts with a song already in your Library.</p>}
     <h2>Drafts</h2>{projects.filter(project => project.status !== 'completed').map(project => <p key={project.id}><Link href={`/studio/${project.id}`}>{project.title}</Link></p>)}
-    <h2>Completed Exports</h2>{projects.flatMap(project => project.jobs.filter(job => job.status === 'completed').map(job => <p key={job.id}><Link href={`/studio/${project.id}`}>{project.title} · Export {job.id}</Link></p>))}
+    <h2>Completed Exports</h2>{projects.flatMap(project => project.jobs.filter(job => job.status === 'completed').map(job => <div key={job.id}><Link href={`/studio/${project.id}`}>{project.title} · Export {job.id}</Link><RenderActions projectId={project.id} jobId={job.id} onDeleted={() => setProjects(items => items.map(item => item.id === project.id ? { ...item, jobs: item.jobs.filter(value => value.id !== job.id) } : item))} /></div>))}
   </>;
 }
 

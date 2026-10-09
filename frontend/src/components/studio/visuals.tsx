@@ -9,7 +9,8 @@ import { ClipPreview } from './clip-preview';
 import { TextStylePanel } from './text-style-panel';
 import { TextStyle, resolveTextStyle } from '@/lib/studio-text-style';
 
-export function Visuals({ project, setProject, disabled, pause, run, pendingStyle, setPendingStyle, selected, setSelected }: { pendingStyle: TextStyle | null; setPendingStyle: Dispatch<SetStateAction<TextStyle | null>>; selected: number[]; setSelected: Dispatch<SetStateAction<number[] | null>>; project: ContentProject; setProject: (project: ContentProject) => void; disabled: boolean; pause: () => void; run: (work: () => Promise<void>) => Promise<void> }) {
+export function Visuals({ project, setProject, disabled: baseDisabled, pause, run, timelineDirty, onTimelineDirty, pendingStyle, setPendingStyle, selected, setSelected }: { timelineDirty: boolean; onTimelineDirty: (dirty: boolean) => void; pendingStyle: TextStyle | null; setPendingStyle: Dispatch<SetStateAction<TextStyle | null>>; selected: number[]; setSelected: Dispatch<SetStateAction<number[] | null>>; project: ContentProject; setProject: (project: ContentProject) => void; disabled: boolean; pause: () => void; run: (work: () => Promise<void>) => Promise<void> }) {
+  const disabled = baseDisabled || timelineDirty;
   const [results, setResults] = useState<Media[]>([]);
   const [librarySource, setLibrarySource] = useState('all');
   const [libraryError, setLibraryError] = useState('');
@@ -62,9 +63,9 @@ export function Visuals({ project, setProject, disabled, pause, run, pendingStyl
     requestAnimationFrame(() => { browser.current?.scrollIntoView({ block: 'start' }); browser.current?.querySelector('input')?.focus({ preventScroll: true }); });
   }
   const shown = tab === 'library' ? results.filter(item => librarySource === 'all' || (librarySource === 'upload' ? item.provider === 'upload' : item.provider !== 'upload')) : results;
-  return <section className="studio-panel studio-visuals"><h2>4. Visuals</h2><p>Build with your clips, or discover footage from <a href="https://pixabay.com/" target="_blank" rel="noreferrer">Pixabay</a> and <a href="https://www.pexels.com/" target="_blank" rel="noreferrer">Pexels</a>. Landscape clips are center-cropped to vertical.</p>
+  return <section className="studio-panel studio-visuals"><h2>4. Visuals</h2><p>Build with your clips, or discover footage from <a href="https://pixabay.com/" target="_blank" rel="noreferrer">Pixabay</a> and <a href="https://www.pexels.com/" target="_blank" rel="noreferrer">Pexels</a>. Select a timeline clip to adjust its crop and position in the vertical frame.</p>
     <div className="studio-visual-layout">
-      {!!project.clips.length ? <div ref={draft}><DraftTimeline project={project} textStyle={textStyle} disabled={disabled} onReplace={item => { setReplace(item.id); openBrowser(); }} /></div>
+      {!!project.clips.length ? <div ref={draft}><DraftTimeline onDirty={onTimelineDirty} onSaved={setProject} project={project} textStyle={textStyle} disabled={baseDisabled} onReplace={item => { setReplace(item.id); openBrowser(); }} /></div>
         : <div className="studio-empty-draft"><h3>Your draft</h3><p>Generate a draft or choose footage to preview your lyrics over video.</p></div>}
       <TextStylePanel value={textStyle} dirty={pendingStyle !== null} disabled={disabled} saved={styleSaved}
         onChange={value => { setPendingStyle(value); setStyleSaved(false); }} cancel={() => setPendingStyle(null)}

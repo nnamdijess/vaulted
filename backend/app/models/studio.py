@@ -68,6 +68,7 @@ class ContentClip(Base):
     start_time: Mapped[float]
     end_time: Mapped[float]
     source_start: Mapped[float] = mapped_column(default=0)
+    framing: Mapped[dict] = mapped_column(JSON, default=dict)
     media: Mapped[ContentMedia] = relationship()
 
 

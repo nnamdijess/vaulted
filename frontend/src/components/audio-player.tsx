@@ -1,5 +1,6 @@
 "use client";
 
+import { useMusicSession } from "@/lib/music-session";
 import { Waveform } from "./waveform";
 import Link from "next/link";
 import { usePathname } from 'next/navigation';
@@ -29,6 +30,7 @@ export type QueueTrack = {
   publicToken?: string;
   projectId?: number;
   coverUrl?: string;
+  album?: string;
 };
 
 export function trackFor(
@@ -46,6 +48,7 @@ export function trackFor(
         versionId: song.latest_version_id,
         projectId: song.project_id,
         coverUrl: projectCoverUrl(project),
+        album: project?.name,
       }
     : null;
 }
@@ -328,6 +331,7 @@ export function AudioPlayerProvider({
         ? {
             ...track,
             coverUrl: projectCoverUrl(project),
+            album: project.name,
             fallbackArtist:
               project.artist || project.owner_name,
             usesOwnerName: !project.artist,
@@ -448,6 +452,11 @@ export function AudioPlayerProvider({
       setIndex(indexRef.current);
     }
   }
+
+  useMusicSession(current, artist, !!current && !studioActive, playing, elapsed, duration, {
+    play: resume, pause: () => audio.current?.pause(), previous: () => move(-1), next: () => move(1),
+    seek: time => { if (audio.current) audio.current.currentTime = Math.max(0, Math.min(duration, time)); },
+  });
 
   return (
     <Context.Provider

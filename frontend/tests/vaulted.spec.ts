@@ -17,12 +17,12 @@ test('Vaulted preferences persist, tracks drag into saved order, and mobile play
   await page.getByRole('button', { name: 'Save preferences' }).click();
   await expect(page.locator('.account-scope')).toHaveAttribute('data-accent','blue');
   await page.getByLabel('Theme', { exact: true }).selectOption('light');
-  await expect(page.locator('.brand .dot')).toHaveCSS('color','rgb(18, 98, 181)');
+  await expect(page.getByRole('button', { name: 'Save preferences', exact: true })).toHaveCSS('background-color','rgb(18, 98, 181)');
   await page.reload();
   await expect(page.getByLabel('Library name', { exact: true })).toHaveValue('Night sessions');
   await expect(page.getByRole('combobox', { name: 'Accent color', exact: true })).toHaveValue('blue');
   await page.getByLabel('Theme', { exact: true }).selectOption('dark');
-  await expect(page.locator('.brand .dot')).toHaveCSS('color','rgb(88, 173, 255)');
+  await expect(page.getByRole('button', { name: 'Save preferences', exact: true })).toHaveCSS('background-color','rgb(88, 173, 255)');
   await page.goto('/projects');
   await expect(page.getByRole('heading', { name: 'Night sessions' })).toBeVisible();
   await page.goto(`/projects/${project.id}`);

@@ -8,6 +8,10 @@ def upgrade_local_database(engine: Engine) -> None:
     with engine.begin() as connection:
         # Serialize startup upgrades when multiple local workers start together.
         connection.exec_driver_sql("BEGIN IMMEDIATE")
+        if inspect(connection).has_table('content_clips'):
+            columns = {c['name'] for c in inspect(connection).get_columns('content_clips')}
+            if 'framing' not in columns:
+                connection.exec_driver_sql("ALTER TABLE content_clips ADD COLUMN framing JSON NOT NULL DEFAULT '{}'")
         if inspect(connection).has_table('content_projects'):
             columns = {c['name'] for c in inspect(connection).get_columns('content_projects')}
             if 'media_pool' not in columns:

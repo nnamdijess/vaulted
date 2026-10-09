@@ -32,6 +32,7 @@ class Timing(Input):
 
 
 class TextStyle(Input):
+    font_size: float | None = Field(default=None, ge=24, le=160)
     bold: bool = False
     italic: bool = False
     underline: bool = False
@@ -88,3 +89,28 @@ class CollectionInput(Input):
         if any(not word.strip() or len(word.strip()) > 100 for word in value):
             raise ValueError('Each keyword must be 1–100 characters')
         return list(dict.fromkeys(word.strip() for word in value))
+
+
+class Framing(Input):
+    mode: Literal['fit', 'fill'] = 'fill'
+    zoom: float = Field(default=1, ge=1, le=4)
+    x: float = Field(default=0.5, ge=0, le=1)
+    y: float = Field(default=0.5, ge=0, le=1)
+
+
+class TimelineClip(Input):
+    media_id: int = Field(gt=0)
+    duration: float = Field(ge=1/30, le=60)
+    source_start: float = Field(default=0, ge=0, le=600)
+    framing: Framing = Field(default_factory=Framing)
+
+
+class Timeline(Input):
+    revision: int = Field(gt=0)
+    clips: list[TimelineClip] = Field(max_length=200)
+
+
+class LyricPreview(Input):
+    text: str = Field(max_length=500)
+    style: TextStyle
+    preset: Literal['minimal', 'large', 'lower', 'highlight'] = 'minimal'

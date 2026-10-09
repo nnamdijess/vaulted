@@ -14,8 +14,8 @@ def ass_time(seconds):
 
 def subtitles(snapshot):
     style = snapshot['lyric_style']
-    size = 72 if style == 'large' else 48
     custom = snapshot.get('text_style') or {}
+    size = custom.get('font_size') or (72 if style == 'large' else 48)
     alignment = (1 if style == 'lower' else 4) + {'left': 0, 'center': 1, 'right': 2}.get(custom.get('align'), 1)
     color = custom.get('color', '#FFFF80' if style == 'highlight' else '#FFFFFF').lstrip('#')
     primary = f'&H00{color[4:6]}{color[2:4]}{color[0:2]}'.upper()
@@ -67,9 +67,9 @@ def render(job_id, snapshot, update_progress):
                 download_video(media['video_url'], stock)
             filename = f'clip-{index}.mp4'
             treatment = ',hue=s=0' if snapshot.get('render_aesthetic', snapshot['aesthetic']) == 'black-white' else ''
-            command(['-protocol_whitelist', 'file,pipe', '-ss', str(clip['source_start']), '-f', 'mov', '-i', str(stock),
+            command(['-protocol_whitelist', 'file,pipe', '-stream_loop', '-1', '-ss', str(clip['source_start']), '-f', 'mov', '-i', str(stock),
                      '-t', str(clip['end_time'] - clip['start_time']), '-an',
-                     '-vf', f'scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,fps=30{treatment}',
+                     '-vf', framing_filter(clip.get('framing') or {}) + f',setsar=1,fps=30{treatment}',
                      '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-pix_fmt', 'yuv420p', '-threads', '2', filename], work)
             files.append(f"file '{filename}'")
             update_progress(int(70 * (index + 1) / len(snapshot['clips'])))
@@ -89,3 +89,15 @@ def render(job_id, snapshot, update_progress):
         return output_key
     finally:
         shutil.rmtree(work, ignore_errors=True)
+
+
+def framing_filter(frame):
+    # Same normalized free-space coordinates as the browser's object-position.
+    zoom = frame.get('zoom', 1)
+    x, y = frame.get('x', 0.5), frame.get('y', 0.5)
+    fit = frame.get('mode', 'fill') == 'fit'
+    mode = 'decrease' if fit else 'increase'
+    width, height = round(1080 * zoom / 2) * 2, round(1920 * zoom / 2) * 2
+    return (f'scale={width}:{height}:force_original_aspect_ratio={mode}:force_divisible_by=2,'
+            f"crop=w='min(iw,1080)':h='min(ih,1920)':x='(iw-ow)*{x}':y='(ih-oh)*{y}',"
+            f"pad=1080:1920:x='(ow-iw)*{x}':y='(oh-ih)*{y}':color=black")

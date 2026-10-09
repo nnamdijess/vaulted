@@ -22,6 +22,7 @@ test('Studio text panel previews, cancels and saves color font and alignment', a
   await panel.getByRole('button', { name: 'Align left' }).click();
   await panel.getByLabel('Letter spacing').fill('0.1');
   await panel.getByLabel('Text width').fill('60');
+  await panel.getByRole('slider', { name: /Font Size/ }).fill('96');
   await page.getByRole('button', { name: '2. Lyrics', exact: true }).click();
   await page.getByRole('button', { name: 'Save draft', exact: true }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Draft saved' })).toBeVisible();
@@ -30,7 +31,7 @@ test('Studio text panel previews, cancels and saves color font and alignment', a
   await panel.getByRole('button', { name: 'Save text style' }).click();
   await expect(panel.getByRole('status')).toHaveText('Text style saved.');
   const saved = await (await request.get(`http://127.0.0.1:8011/api/studio/projects/${draft.id}`)).json();
-  expect(saved.text_style).toEqual({ bold: false, italic: false, underline: false, color: '#12abef', font: 'anton', align: 'left', letter_spacing: 0.1, text_width: 60 });
+  expect(saved.text_style).toEqual({ font_size: 96, bold: false, italic: false, underline: false, color: '#12abef', font: 'anton', align: 'left', letter_spacing: 0.1, text_width: 60 });
   await page.reload();
   await page.getByRole('button', { name: '4. Visuals', exact: true }).click();
   await expect(panel.getByRole('button', { name: 'Anton', exact: true })).toHaveAttribute('aria-pressed', 'true');

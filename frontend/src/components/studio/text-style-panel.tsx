@@ -27,6 +27,10 @@ export function TextStylePanel({ value, onChange, dirty, disabled, save, cancel,
       {(['left', 'center', 'right'] as const).map(align => <button type="button" key={align} className="secondary" aria-label={`Align ${align}`}
         aria-pressed={value.align === align} onClick={() => onChange({ ...value, align })}>{align[0].toUpperCase() + align.slice(1)}</button>)}
     </div></fieldset>
+    <fieldset disabled={disabled}><legend>Font Size</legend>
+      <label>Font Size: {value.font_size ?? 48}px<input aria-label="Font Size" type="range" min="24" max="160" step="1" value={value.font_size ?? 48} onChange={event => onChange({ ...value, font_size: Number(event.target.value) })} /></label>
+      <small>Pixels in the 1080 × 1920 export.</small>
+    </fieldset>
     <fieldset disabled={disabled}><legend>Spacing</legend>
       <label>Letter spacing<input type="range" min="0" max="0.3" step="0.01" value={value.letter_spacing ?? 0} onChange={event => onChange({ ...value, letter_spacing: Number(event.target.value) })} /></label>
       <label>Text width<input type="range" min="40" max="90" step="1" value={value.text_width ?? 82} onChange={event => onChange({ ...value, text_width: Number(event.target.value) })} /></label>

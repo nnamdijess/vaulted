@@ -56,7 +56,7 @@ class StudioTest(unittest.TestCase):
 
     def test_lyric_and_sync_edits_preserve_visuals(self):
         draft = self.draft()
-        style = {'bold': False, 'italic': False, 'underline': False, 'font': 'anton', 'color': '#FF9F43', 'align': 'right', 'letter_spacing': 0.1, 'text_width': 60}
+        style = {'font_size': None, 'bold': False, 'italic': False, 'underline': False, 'font': 'anton', 'color': '#FF9F43', 'align': 'right', 'letter_spacing': 0.1, 'text_width': 60}
         self.assertEqual(self.client.put(self.url + '/text-style', json=style).status_code, 200)
         updated = self.edit(lyrics_text='Edited line\nSecond line').json()
         self.assertEqual(updated['clips'], draft['clips'])
@@ -86,6 +86,139 @@ class StudioTest(unittest.TestCase):
             self.assertTrue(self.client.get(self.url).json()['text_style']['bold'])
         plain = self.client.put(self.url + '/text-style', json={**style, 'bold': False, 'italic': False, 'underline': False}).json()
         self.assertIn('&H80000000,0,0,0,0,100,100', subtitles(plain))
+
+    def test_timeline_operations_revision_ownership_and_framing(self):
+        draft = self.draft()
+        media = draft['clips'][0]['media_id']
+        frame = {'mode': 'fill', 'zoom': 2, 'x': 0.2, 'y': 0.8}
+        body = {'revision': draft['revision'], 'clips': [
+            {'media_id': media, 'duration': 1, 'source_start': 0.5, 'framing': frame},
+            {'media_id': media, 'duration': 2, 'source_start': 1.5, 'framing': frame}]}
+        self.assertEqual(self.other.put(self.url + '/timeline', json=body).status_code, 404)
+        self.assertEqual(self.public.put(self.url + '/timeline', json=body).status_code, 401)
+        response = self.client.put(self.url + '/timeline', json=body)
+        self.assertEqual(response.status_code, 200, response.text)
+        saved = response.json()
+        self.assertEqual([(c['start_time'], c['end_time']) for c in saved['clips']], [(0, 1), (1, 3)])
+        self.assertEqual(saved['clips'][1]['framing'], frame)
+        self.assertEqual(self.client.put(self.url + '/timeline', json=body).status_code, 409)
+        body['revision'] = saved['revision']
+        body['clips'].reverse()
+        saved = self.client.put(self.url + '/timeline', json=body).json()
+        self.assertEqual(saved['clips'][0]['source_start'], 1.5)
+        self.assertEqual(saved['clips'][0]['framing'], frame)
+        body['revision'] = saved['revision']
+        body['clips'][0]['framing']['zoom'] = 99
+        self.assertEqual(self.client.put(self.url + '/timeline', json=body).status_code, 422)
+        body['clips'][0]['framing']['zoom'] = 2
+        body['clips'].pop()
+        saved = self.client.put(self.url + '/timeline', json=body).json()
+        self.assertEqual(len(saved['clips']), 1)
+        self.assertEqual(self.client.post(self.url + '/renders').status_code, 422)
+        self.assertTrue(self.client.get('/api/studio/media/favorites').status_code == 200)
+
+    def test_render_delete_handles_missing_files_and_rejects_other_paths(self):
+        from app.models.studio import ContentRenderJob
+        from app.services.studio_storage import content_path
+        with self.sessions() as db:
+            job = ContentRenderJob(content_project_id=self.project['id'], snapshot={'revision': 1}, status='completed')
+            db.add(job); db.flush()
+            identifier = job.id
+            job.output_path = 'library/keep.mp4'
+            db.commit()
+        safe = content_path('library/keep.mp4')
+        safe.parent.mkdir(parents=True, exist_ok=True)
+        safe.write_bytes(b'keep')
+        endpoint = self.url + f'/renders/{identifier}'
+        self.assertEqual(self.client.delete(endpoint).status_code, 409)
+        self.assertEqual(safe.read_bytes(), b'keep')
+        with self.sessions() as db:
+            db.get(ContentRenderJob, identifier).output_path = '../outside.mp4'
+            db.commit()
+        self.assertEqual(self.client.delete(endpoint).status_code, 409)
+        with self.sessions() as db:
+            db.get(ContentRenderJob, identifier).output_path = f"projects/{self.project['id']}/renders/{identifier}.mp4"
+            db.commit()
+        self.assertEqual(self.client.delete(endpoint).status_code, 204)
+        self.assertEqual(self.client.get(endpoint).status_code, 404)
+
+    def test_crop_positions_and_reroll_preserve_clip_edits(self):
+        from app.services.studio_renderer import framing_filter
+        from app.services.studio_storage import ffmpeg
+        from PIL import Image
+        import subprocess
+        source = Path(self.temp.name) / 'framing.png'
+        image = Image.new('RGB', (400, 200), 'red')
+        image.paste('blue', (200, 0, 400, 200))
+        image.save(source)
+        for x, channel in [(0, 0), (1, 2)]:
+            pixels = subprocess.run([ffmpeg(), '-v', 'error', '-i', str(source), '-vf',
+                framing_filter({'mode': 'fill', 'zoom': 1, 'x': x, 'y': .5}) + ',scale=1:1',
+                '-frames:v', '1', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-'], capture_output=True, check=True).stdout
+            self.assertGreater(pixels[channel], 240)
+            self.assertLess(pixels[2 if channel == 0 else 0], 10)
+        draft = self.draft()
+        mid = draft['clips'][0]['media_id']
+        saved = self.client.put(self.url + '/timeline', json={'revision': draft['revision'], 'clips': [
+            {'media_id': mid, 'duration': 1, 'source_start': .2, 'framing': {'zoom': 2}},
+            {'media_id': mid, 'duration': 2, 'source_start': .5, 'framing': {'zoom': 3}}]}).json()
+        shuffled = self.client.post(self.url + '/draft', json={'mode': 'order'}).json()
+        summary = lambda value: sorted((c['end_time']-c['start_time'], c['source_start'], c['framing']['zoom']) for c in value['clips'])
+        self.assertEqual(summary(saved), summary(shuffled))
+
+    def test_lyric_raster_matches_export_coordinates_and_size(self):
+        from PIL import Image
+        from app.services.studio_renderer import subtitles
+        style = {'font': 'anton', 'color': '#FFFFFF', 'align': 'center', 'font_size': 48}
+        payload = {'text': 'Hello', 'style': style, 'preset': 'minimal'}
+        self.assertEqual(self.other.post(self.url + '/lyric-preview', json=payload).status_code, 404)
+        response = self.client.post(self.url + '/lyric-preview', json=payload)
+        self.assertEqual(response.status_code, 200, response.text)
+        small = Image.open(io.BytesIO(response.content))
+        self.assertEqual(small.size, (1080, 1920))
+        self.assertEqual(small.getpixel((0, 0))[3], 0)
+        payload['style']['font_size'] = 96
+        large = Image.open(io.BytesIO(self.client.post(self.url + '/lyric-preview', json=payload).content))
+        a, b = small.getbbox(), large.getbbox()
+        self.assertGreater(b[2] - b[0], (a[2] - a[0]) * 1.6)
+        saved = self.client.put(self.url + '/text-style', json=payload['style']).json()
+        self.assertIn('Default,Anton,96', subtitles(saved))
+        self.assertEqual(self.client.get(self.url).json()['text_style']['font_size'], 96)
+
+    def test_short_gif_loops_through_render_and_render_delete_is_scoped(self):
+        from PIL import Image
+        from app.services.studio_storage import ffmpeg, content_path
+        import subprocess
+        output = io.BytesIO()
+        frames = [Image.new('RGB', (80, 120), color) for color in ('red', 'blue')]
+        frames[0].save(output, format='GIF', save_all=True, append_images=frames[1:], duration=250, loop=0)
+        item = self.client.post('/api/studio/media/upload', files={'file': ('short.gif', output.getvalue(), 'image/gif')}).json()
+        self.assertEqual(self.client.get(item['preview_url'], headers={'Range': 'bytes=0-31'}).status_code, 206)
+        self.edit(lyrics_text='')
+        draft = self.client.post(self.url + '/draft', json={'media_ids': [item['id']]}).json()
+        self.assertAlmostEqual(draft['clips'][0]['end_time'], 3)
+        body = {'revision': draft['revision'], 'clips': [{'media_id': item['id'], 'duration': 3, 'source_start': 0.1,
+            'framing': {'mode': 'fit', 'zoom': 1, 'x': 0, 'y': 0.5}}]}
+        self.assertEqual(self.client.put(self.url + '/timeline', json=body).status_code, 200)
+        job = self.client.post(self.url + '/renders').json()
+        endpoint = self.url + f"/renders/{job['id']}"
+        self.assertEqual(self.client.delete(endpoint).status_code, 409)
+        with patch('app.studio_worker.SessionLocal', self.sessions):
+            from app.studio_worker import process_one
+            self.assertTrue(process_one())
+        self.assertEqual(self.client.get(endpoint).json()['status'], 'completed')
+        path = content_path(f"projects/{self.project['id']}/renders/{job['id']}.mp4")
+        pixels = subprocess.run([ffmpeg(), '-v', 'error', '-ss', '2.5', '-i', str(path), '-frames:v', '1',
+            '-vf', 'scale=1:1', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-'], capture_output=True, check=True).stdout
+        self.assertEqual(len(pixels), 3)  # A real frame still exists well beyond the 0.5s source.
+        self.assertGreater(max(pixels), 20)
+        self.assertEqual(self.other.delete(endpoint).status_code, 404)
+        self.assertIn('attachment', self.client.get(endpoint + '/video?download=true').headers['content-disposition'])
+        self.assertEqual(self.client.delete(endpoint).status_code, 204)
+        self.assertFalse(path.exists())
+        self.assertEqual(self.client.get(item['preview_url']).status_code, 200)
+        self.assertEqual(self.client.get(self.url).status_code, 200)
+        self.assertEqual(self.client.get(endpoint).status_code, 404)
 
     def test_ownership_sections_lyrics_and_presets(self):
         self.assertEqual(self.public.get(self.url).status_code, 401)
@@ -163,7 +296,7 @@ class StudioTest(unittest.TestCase):
     def test_text_style_validation_ownership_snapshot_and_export(self):
         from app.services.studio_renderer import subtitles
         draft = self.draft()
-        style = {'bold': False, 'italic': False, 'underline': False, 'color': '#12ABEF', 'font': 'anton', 'align': 'right', 'letter_spacing': 0.1, 'text_width': 60}
+        style = {'font_size': None, 'bold': False, 'italic': False, 'underline': False, 'color': '#12ABEF', 'font': 'anton', 'align': 'right', 'letter_spacing': 0.1, 'text_width': 60}
         url = self.url + '/text-style'
         self.assertEqual(self.public.put(url, json=style).status_code, 401)
         self.assertEqual(self.other.put(url, json=style).status_code, 404)

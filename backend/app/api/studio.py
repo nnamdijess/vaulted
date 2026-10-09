@@ -1,12 +1,13 @@
 import random
 import shutil
+import subprocess
 from fastapi import APIRouter, HTTPException, Response, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy import select, or_
 from app.api.music import Database, require_record, lock_track_order
 from app.models.music import Song, SongVersion, Project, utc_now
 from app.models.studio import ContentProject, ContentLyricLine, ContentMedia, ContentClip, ContentRenderJob, AestheticCollection
-from app.schemas.studio import Create, Edit, Timing, Search, Draft, Replace, Favorite, CollectionInput, TextStyle
+from app.schemas.studio import Create, Edit, Timing, Search, Draft, Replace, Favorite, CollectionInput, TextStyle, Timeline, LyricPreview
 from app.services.studio_fonts import FONT_DIR, FONT_FILES
 from app.services.studio_presets import RECIPES, STYLES
 from app.services.studio_storage import duration, content_path
@@ -37,7 +38,7 @@ def view(project, db):
         'project_id': song.project_id, 'cover_path': song.project.cover_path, 'version_name': version.version_name,
         'lines': [{'text': line.text, 'start_time': line.start_time, 'end_time': line.end_time} for line in project.lines],
         'clips': [{'id': clip.id, 'media_id': clip.media_id, 'start_time': clip.start_time, 'end_time': clip.end_time,
-                   'source_start': clip.source_start, 'media': clip.media.metadata_json} for clip in project.clips],
+                   'source_start': clip.source_start, 'framing': clip.framing, 'media': clip.media.metadata_json} for clip in project.clips],
         'jobs': [job_view(job) for job in project.jobs]}
 
 
@@ -327,19 +328,31 @@ def draft(identifier: int, data: Draft, db: Database):
         ids.extend(previous)
         project.media_pool = []
     elif data.mode == 'order':
-        ids = list(dict.fromkeys(clip.media_id for clip in project.clips))
-        random.shuffle(ids)
+        clips = list(project.clips)
+        random.shuffle(clips)
+        elapsed = 0
+        for position, clip in enumerate(clips):
+            duration = clip.end_time - clip.start_time
+            clip.position = position
+            clip.start_time = elapsed
+            clip.end_time = elapsed + duration
+            elapsed += duration
+        changed(project)
+        db.commit()
+        db.refresh(project)
+        return view(project, db)
     ids = list(dict.fromkeys(ids))
     media = [owned(db, ContentMedia, value) for value in ids]
     length = project.end_time - project.start_time
-    if not media or sum(min(4, item.metadata_json['duration']) for item in media) < length:
-        raise HTTPException(422, 'Select more distinct clips to cover the section (up to four seconds per clip).')
+    if not media:
+        raise HTTPException(422, 'Select at least one clip.')
     project.clips.clear()
     elapsed = 0
-    for position, item in enumerate(media):
+    for position in range(200):
         if elapsed >= length:
             break
-        end = min(length, elapsed + min(4, item.metadata_json['duration']))
+        item = media[position % len(media)]
+        end = min(length, elapsed + 4)
         project.clips.append(ContentClip(media_id=item.id, position=position, start_time=elapsed, end_time=end))
         elapsed = end
     changed(project)
@@ -367,13 +380,62 @@ def replace(identifier: int, clip_id: int, data: Replace, db: Database):
     media = owned(db, ContentMedia, data.media_id)
     if clip is None:
         raise HTTPException(404, 'Clip not found')
-    if media.metadata_json['duration'] < clip.end_time - clip.start_time:
-        raise HTTPException(422, 'Choose a longer clip')
     clip.media = media
     clip.source_start = 0
     changed(project)
     db.commit()
     return view(project, db)
+
+
+@router.put('/projects/{identifier}/timeline')
+def save_timeline(identifier: int, data: Timeline, db: Database):
+    lock_track_order(db)
+    project = owned(db, ContentProject, identifier)
+    if project.revision != data.revision:
+        raise HTTPException(409, 'This draft changed elsewhere. Reload before editing the timeline.')
+    length = project.end_time - project.start_time
+    if sum(item.duration for item in data.clips) > length + 0.02:
+        raise HTTPException(422, 'Timeline exceeds the song section. Shorten a clip before inserting more footage.')
+    for item in data.clips:
+        media = owned(db, ContentMedia, item.media_id)
+        if item.source_start >= media.metadata_json['duration']:
+            raise HTTPException(422, 'Source start must be within the original clip.')
+    project.clips.clear()
+    elapsed = 0
+    for position, item in enumerate(data.clips):
+        end = round(elapsed + item.duration, 6)
+        project.clips.append(ContentClip(media_id=item.media_id, position=position, start_time=elapsed,
+            end_time=end, source_start=item.source_start, framing=item.framing.model_dump()))
+        elapsed = end
+    changed(project)
+    db.commit()
+    return view(project, db)
+
+
+@router.delete('/projects/{identifier}/renders/{job_id}', status_code=204)
+def delete_render(identifier: int, job_id: int, db: Database):
+    lock_track_order(db)
+    project = owned(db, ContentProject, identifier)
+    job = next((item for item in project.jobs if item.id == job_id), None)
+    if job is None:
+        raise HTTPException(404, 'Render not found')
+    if job.status in ('queued', 'rendering'):
+        raise HTTPException(409, 'Wait for this render to finish before deleting it.')
+    if job.output_path:
+        expected = content_path(f'projects/{identifier}/renders/{job_id}.mp4')
+        try:
+            actual = content_path(job.output_path)
+        except ValueError:
+            raise HTTPException(409, 'Unexpected render path; file was not deleted.') from None
+        if actual != expected:
+            raise HTTPException(409, 'Unexpected render path; file was not deleted.')
+        try:
+            expected.unlink(missing_ok=True)
+        except OSError:
+            raise HTTPException(503, 'Could not remove this file. Try again.') from None
+    db.delete(job)
+    db.commit()
+    return Response(status_code=204)
 
 
 @router.post('/projects/{identifier}/renders', status_code=202)
@@ -384,6 +446,8 @@ def render(identifier: int, db: Database):
         raise HTTPException(409, 'A render is already queued or running')
     if not project.clips or any(line.start_time is None for line in project.lines):
         raise HTTPException(422, 'Generate a draft and time every lyric line before rendering')
+    if abs(project.clips[-1].end_time - (project.end_time - project.start_time)) > 0.04:
+        raise HTTPException(422, 'Fill the remaining timeline before rendering.')
     snapshot = view(project, db)
     collection = collection_for(db, project.aesthetic)
     snapshot['render_aesthetic'] = collection.base_aesthetic if collection else project.aesthetic
@@ -428,3 +492,14 @@ def remove(identifier: int, db: Database):
     db.commit()
     shutil.rmtree(content_path(f'projects/{identifier}'), ignore_errors=True)
     return Response(status_code=204)
+
+
+@router.post('/projects/{identifier}/lyric-preview')
+def preview_lyric(identifier: int, data: LyricPreview, db: Database):
+    owned(db, ContentProject, identifier)
+    from app.services.studio_text_preview import lyric_png
+    try:
+        image = lyric_png(data.text, data.style.model_dump(), data.preset)
+    except (OSError, RuntimeError, subprocess.TimeoutExpired):
+        raise HTTPException(503, 'Could not prepare lyric preview. Check FFmpeg.') from None
+    return Response(image, media_type='image/png', headers={'Cache-Control': 'private, no-store'})
