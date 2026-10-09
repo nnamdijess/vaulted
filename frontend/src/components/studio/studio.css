@@ -121,3 +121,9 @@
 @font-face { font-family: 'Vaulted Bebas Neue'; src: url('/api/studio/fonts/bebas') format('truetype'); font-display: swap; }
 @font-face { font-family: 'Vaulted Dela Gothic One'; src: url('/api/studio/fonts/dela') format('truetype'); font-display: swap; }
 @font-face { font-family: 'Vaulted Bowlby One SC'; src: url('/api/studio/fonts/bowlby') format('truetype'); font-display: swap; }
+
+@font-face { font-family: 'Vaulted Montserrat'; src: url('/api/studio/fonts/montserrat') format('truetype'); font-display: swap; }
+@font-face { font-family: 'Vaulted Playfair Display'; src: url('/api/studio/fonts/playfair') format('truetype'); font-display: swap; }
+@font-face { font-family: 'Vaulted Oswald'; src: url('/api/studio/fonts/oswald') format('truetype'); font-display: swap; }
+@font-face { font-family: 'Vaulted Unbounded'; src: url('/api/studio/fonts/unbounded') format('truetype'); font-display: swap; }
+@font-face { font-family: 'Vaulted Josefin Sans'; src: url('/api/studio/fonts/josefin') format('truetype'); font-display: swap; }

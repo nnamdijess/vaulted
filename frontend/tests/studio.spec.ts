@@ -30,13 +30,13 @@ test('Studio text panel previews, cancels and saves color font and alignment', a
   await panel.getByRole('button', { name: 'Save text style' }).click();
   await expect(panel.getByRole('status')).toHaveText('Text style saved.');
   const saved = await (await request.get(`http://127.0.0.1:8011/api/studio/projects/${draft.id}`)).json();
-  expect(saved.text_style).toEqual({ color: '#12abef', font: 'anton', align: 'left', letter_spacing: 0.1, text_width: 60 });
+  expect(saved.text_style).toEqual({ bold: false, italic: false, underline: false, color: '#12abef', font: 'anton', align: 'left', letter_spacing: 0.1, text_width: 60 });
   await page.reload();
   await page.getByRole('button', { name: '4. Visuals', exact: true }).click();
   await expect(panel.getByRole('button', { name: 'Anton', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(sample).toHaveCSS('color', 'rgb(18, 171, 239)');
   await expect(sample).toHaveCSS('text-align', 'left');
-  for (const [label, font] of [['Abel', 'abel'], ['Mono', 'mono'], ['Bebas Neue', 'bebas'], ['Dela Gothic One', 'dela'], ['Bowlby One SC', 'bowlby']]) {
+  for (const [label, font] of [['Abel', 'abel'], ['Mono', 'mono'], ['Bebas Neue', 'bebas'], ['Dela Gothic One', 'dela'], ['Bowlby One SC', 'bowlby'], ['Montserrat', 'montserrat'], ['Playfair Display', 'playfair'], ['Oswald', 'oswald'], ['Unbounded', 'unbounded'], ['Josefin Sans', 'josefin']]) {
     await panel.getByRole('button', { name: label, exact: true }).click();
     await expect.poll(() => page.evaluate(async family => (await document.fonts.load(`20px "Vaulted ${family}"`)).length, label)).toBe(1);
     await panel.getByRole('button', { name: 'Save text style' }).click();
@@ -46,6 +46,15 @@ test('Studio text panel previews, cancels and saves color font and alignment', a
     await expect(panel.getByRole('button', { name: label, exact: true })).toHaveAttribute('aria-pressed', 'true');
     expect((await (await request.get(`http://127.0.0.1:8011/api/studio/projects/${draft.id}`)).json()).text_style.font).toBe(font);
   }
+  for (const name of ['Bold', 'Italic', 'Underline']) await panel.getByRole('button', { name, exact: true }).click();
+  await expect(sample).toHaveCSS('font-weight', '700');
+  await expect(sample).toHaveCSS('font-style', 'italic');
+  await expect(sample).toHaveCSS('text-decoration-line', 'underline');
+  await panel.getByRole('button', { name: 'Save text style' }).click();
+  await expect(panel.getByRole('status')).toHaveText('Text style saved.');
+  await page.reload();
+  await page.getByRole('button', { name: '4. Visuals', exact: true }).click();
+  for (const name of ['Bold', 'Italic', 'Underline']) await expect(panel.getByRole('button', { name, exact: true })).toHaveAttribute('aria-pressed', 'true');
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.screenshot({ path: testInfo.outputPath('text-panel-desktop.png'), fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });

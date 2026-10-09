@@ -56,7 +56,7 @@ class StudioTest(unittest.TestCase):
 
     def test_lyric_and_sync_edits_preserve_visuals(self):
         draft = self.draft()
-        style = {'font': 'anton', 'color': '#FF9F43', 'align': 'right', 'letter_spacing': 0.1, 'text_width': 60}
+        style = {'bold': False, 'italic': False, 'underline': False, 'font': 'anton', 'color': '#FF9F43', 'align': 'right', 'letter_spacing': 0.1, 'text_width': 60}
         self.assertEqual(self.client.put(self.url + '/text-style', json=style).status_code, 200)
         updated = self.edit(lyrics_text='Edited line\nSecond line').json()
         self.assertEqual(updated['clips'], draft['clips'])
@@ -71,6 +71,21 @@ class StudioTest(unittest.TestCase):
         self.assertEqual(changed['clips'], [])
         self.assertTrue(all(line['start_time'] is None for line in changed['lines']))
         self.assertEqual(changed['text_style'], style)
+
+    def test_formatting_exports_and_new_font_files(self):
+        from app.services.studio_renderer import subtitles
+        for font in ('montserrat', 'playfair', 'oswald', 'unbounded', 'josefin'):
+            response = self.client.get(f'/api/studio/fonts/{font}')
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.content[:4], b'\x00\x01\x00\x00')
+            self.assertEqual(self.other.get(f'/api/studio/fonts/{font}').status_code, 200)
+            style = {'font': font, 'color': '#FFFFFF', 'align': 'center', 'bold': True, 'italic': True, 'underline': True}
+            result = self.client.put(self.url + '/text-style', json=style)
+            self.assertEqual(result.status_code, 200)
+            self.assertIn('&H80000000,-1,-1,-1,0,100,100', subtitles(result.json()))
+            self.assertTrue(self.client.get(self.url).json()['text_style']['bold'])
+        plain = self.client.put(self.url + '/text-style', json={**style, 'bold': False, 'italic': False, 'underline': False}).json()
+        self.assertIn('&H80000000,0,0,0,0,100,100', subtitles(plain))
 
     def test_ownership_sections_lyrics_and_presets(self):
         self.assertEqual(self.public.get(self.url).status_code, 401)
@@ -148,7 +163,7 @@ class StudioTest(unittest.TestCase):
     def test_text_style_validation_ownership_snapshot_and_export(self):
         from app.services.studio_renderer import subtitles
         draft = self.draft()
-        style = {'color': '#12ABEF', 'font': 'anton', 'align': 'right', 'letter_spacing': 0.1, 'text_width': 60}
+        style = {'bold': False, 'italic': False, 'underline': False, 'color': '#12ABEF', 'font': 'anton', 'align': 'right', 'letter_spacing': 0.1, 'text_width': 60}
         url = self.url + '/text-style'
         self.assertEqual(self.public.put(url, json=style).status_code, 401)
         self.assertEqual(self.other.put(url, json=style).status_code, 404)
