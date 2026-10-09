@@ -23,8 +23,8 @@ def ingest_video(upload):
 
 def _ingest_video(upload):
     suffix = Path(upload.filename or '').suffix.lower()
-    if suffix not in {'.mp4', '.mov', '.m4v', '.webm'}:
-        raise HTTPException(422, 'Choose an MP4, MOV, M4V or WebM video.')
+    if suffix not in {'.mp4', '.mov', '.m4v', '.webm', '.gif'}:
+        raise HTTPException(422, 'Choose an MP4, MOV, M4V, WebM or animated GIF.')
     identifier = uuid.uuid4().hex
     directory = content_path(f'library/{identifier}')
     directory.mkdir(parents=True)
@@ -38,9 +38,11 @@ def _ingest_video(upload):
                     raise HTTPException(413, 'Video exceeds the upload size limit (250 MiB by default).')
                 output.write(chunk)
         # Force a self-contained container, rather than accepting playlists or URLs.
-        container = 'matroska' if suffix == '.webm' else 'mov'
+        container = {'.webm': 'matroska', '.gif': 'gif'}.get(suffix, 'mov')
+        # Import one animation cycle, regardless of an infinite GIF loop flag.
+        input_options = ['-ignore_loop', '1'] if suffix == '.gif' else []
         probe = subprocess.run([ffmpeg(), '-hide_banner', '-nostdin', '-protocol_whitelist', 'file,pipe',
-                                '-f', container, '-i', str(source)], capture_output=True, timeout=10)
+                                '-f', container, *input_options, '-i', str(source)], capture_output=True, timeout=10)
         match = re.search(rb'Duration: (\d+):(\d+):(\d+\.\d+)', probe.stderr)
         if not match or b'Video:' not in probe.stderr:
             raise HTTPException(422, 'This file does not contain a readable video.')
@@ -49,7 +51,7 @@ def _ingest_video(upload):
         if not 0 < duration <= 600:
             raise HTTPException(422, 'Upload clips up to 10 minutes long.')
         result = subprocess.run([ffmpeg(), '-v', 'error', '-nostdin', '-y', '-protocol_whitelist', 'file,pipe',
-            '-f', container, '-i', str(source), '-map', '0:v:0', '-an', '-sn', '-dn',
+            '-f', container, *input_options, '-i', str(source), '-map', '0:v:0', '-an', '-sn', '-dn',
             '-vf', "scale='min(1280,iw)':'min(1280,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2,setsar=1",
             '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-pix_fmt', 'yuv420p',
             '-threads', '2', '-movflags', '+faststart', str(directory / 'video.mp4')],

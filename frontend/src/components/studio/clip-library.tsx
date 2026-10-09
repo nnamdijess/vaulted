@@ -26,8 +26,8 @@ export function ClipLibraryTools({ disabled, run, onResults }: { disabled: boole
         throw error;
       } finally { setFiles(current => current.slice(uploaded.length)); }
     }); }}>
-      <label>Video files<input type="file" multiple accept=".mp4,.mov,.m4v,.webm" disabled={disabled} onChange={event => { setFiles(Array.from(event.target.files || [])); setStatus(''); }} /></label>
-      <p>MP4, MOV, M4V or WebM. Up to 250 MiB and 10 minutes per clip. Videos are copied into your private library and prepared without audio for Studio.</p>
+      <label>Video files<input type="file" multiple accept=".mp4,.mov,.m4v,.webm,.gif" disabled={disabled} onChange={event => { setFiles(Array.from(event.target.files || [])); setStatus(''); }} /></label>
+      <p>MP4, MOV, M4V, WebM or animated GIF. GIFs become MP4 clips using one animation cycle. Up to 250 MiB and 10 minutes per clip. Videos are copied into your private library and prepared without audio for Studio.</p>
       <button disabled={disabled || !files.length}>Upload videos{files.length ? ` (${files.length})` : ''}</button>
       <p role="status">{status}</p>
     </form>

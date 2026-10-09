@@ -140,7 +140,7 @@ replace a timeline section, or add them to a reusable aesthetic using its Saved 
 Automatic stock generation still uses the chosen provider; custom aesthetic collections can
 generate from their saved uploaded footage without a provider API call.
 
-Uploads accept MP4/MOV/M4V/WebM, up to `MAX_UPLOAD_BYTES` (250 MiB by default), and
+Uploads accept MP4/MOV/M4V/WebM/animated GIF, up to `MAX_UPLOAD_BYTES` (250 MiB by default), and
 10 minutes. FFmpeg validates actual video content and creates a silent H.264 MP4,
 at most 1280 pixels per dimension without upscaling, plus a JPEG poster. Keep originals
 elsewhere if you need their full resolution or original audio. Processing has a 90-second
@@ -161,3 +161,5 @@ Uploading on the development laptop does not automatically transfer files to the
 Backend: `python -m unittest discover -s tests` from backend. Provider network requests are mocked; a short local synthetic clip exercises actual FFmpeg rendering. Frontend: `npm.cmd run lint`, `npm.cmd run typecheck`, `npm.cmd run build`, `npm.cmd run test:e2e`. Playwright uses isolated SQLite/upload/content directories and an empty provider key.
 
 Manual live-provider smoke test after adding your key: choose a song, time two lyric lines, Review Media, preview and select enough clips, generate a draft, replace a clip, render with worker running, preview/download. Verify a different account cannot access the draft or export. Test at 390px and on your actual iPhone PWA (browser emulation does not fully represent iOS media behavior).
+
+Animated GIFs are converted to MP4 using one animation cycle (infinite loop flags are ignored). The resulting clips use the same private previews, tags, selections and export pipeline. MP4 does not preserve GIF transparency.

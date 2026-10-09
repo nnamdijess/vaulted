@@ -95,11 +95,12 @@ test('draft timeline plays across sections, seeks and replaces only the selected
 });
 
 
-test('uploaded clips can be previewed, tagged, filtered and used in a draft on mobile', async ({ page, request }, testInfo) => {
+for (const format of ['mp4', 'gif']) {
+test(`uploaded ${format} clips can be previewed, tagged, filtered and used in a draft on mobile`, async ({ page, request }, testInfo) => {
   const python = path.resolve('../backend', process.platform === 'win32' ? '.venv/Scripts/python.exe' : '.venv/bin/python');
   const ffmpeg = execFileSync(python, ['-c', 'import imageio_ffmpeg; print(imageio_ffmpeg.get_ffmpeg_exe())']).toString().trim();
-  const fixture = testInfo.outputPath('my-neon.mp4');
-  execFileSync(ffmpeg, ['-v', 'error', '-f', 'lavfi', '-i', 'color=c=blue:size=160x240:rate=10', '-t', '4', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', fixture]);
+  const fixture = testInfo.outputPath(`my-neon.${format}`);
+  execFileSync(ffmpeg, ['-v', 'error', '-f', 'lavfi', '-i', 'color=c=blue:size=160x240:rate=10', '-t', '4', ...(format === 'gif' ? ['-loop', '0'] : ['-c:v', 'libx264', '-pix_fmt', 'yuv420p']), fixture]);
   const music = await (await request.post('http://127.0.0.1:8011/api/projects', { data: { name: 'Uploaded clips' } })).json();
   const songs = await (await request.post(`http://127.0.0.1:8011/api/projects/${music.id}/tracks`, { multipart: { files: { name: 'A.wav', mimeType: 'audio/wav', buffer: wav() } } })).json();
   const draft = await (await request.post('http://127.0.0.1:8011/api/studio/projects', { data: { title: 'Uploads', song_version_id: songs[0].latest_version_id } })).json();
@@ -128,3 +129,5 @@ test('uploaded clips can be previewed, tagged, filtered and used in a draft on m
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath('upload-mobile.png'), fullPage: true });
 });
+
+}

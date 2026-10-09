@@ -309,3 +309,24 @@ class StudioTest(unittest.TestCase):
             self.assertEqual(self.client.post('/api/studio/media/upload', files={'file': ('large.mp4', b'123', 'video/mp4')}).status_code, 413)
         self.assertEqual(self.client.get('/api/studio/media/favorites').json(), [])
         self.assertEqual(list((settings.content_dir / 'library').glob('*')), [])
+
+    def test_animated_gif_upload_ignores_infinite_loop_and_exports(self):
+        from PIL import Image
+        output = io.BytesIO()
+        frames = [Image.new('RGB', (80, 120), color) for color in ('red', 'blue', 'green', 'yellow')]
+        frames[0].save(output, format='GIF', save_all=True, append_images=frames[1:], duration=1000, loop=0)
+        response = self.client.post('/api/studio/media/upload', files={'file': ('Animation.GIF', output.getvalue(), 'image/gif')})
+        self.assertEqual(response.status_code, 201, response.text)
+        item = response.json()
+        self.assertAlmostEqual(item['duration'], 4, delta=0.1)
+        self.assertEqual(self.client.get(item['preview_url']).headers['content-type'], 'video/mp4')
+        self.assertEqual(self.client.get(item['thumbnail']).status_code, 200)
+        self.assertEqual(self.other.get(item['preview_url']).status_code, 404)
+        self.edit(lyrics_text='')
+        self.assertEqual(self.client.post(self.url + '/draft', json={'media_ids': [item['id']]}).status_code, 200)
+        job = self.client.post(self.url + '/renders').json()
+        with patch('app.studio_worker.SessionLocal', self.sessions):
+            from app.studio_worker import process_one
+            self.assertTrue(process_one())
+        self.assertEqual(self.client.get(self.url + f"/renders/{job['id']}").json()['status'], 'completed')
+        self.assertEqual(self.client.post('/api/studio/media/upload', files={'file': ('fake.gif', b'not a GIF', 'image/gif')}).status_code, 422)
