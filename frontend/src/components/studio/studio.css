@@ -142,3 +142,28 @@
 .studio-render-actions {max-width:100%;}
 .studio-lyric-raster {position:absolute;inset:0;width:100%;height:100%;pointer-events:none;}
 .studio-lyric-error {position:absolute;bottom:4px;left:4px;font-size:12px;background:#111;color:white;}
+/* Direct manipulation timeline: selected clip options stay compact. */
+.studio-timeline-toolbar, .studio-clip-inspector {display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin:12px 0;}
+.studio-timeline-editor:focus {outline:none;}
+.studio-timeline-editor:focus-visible {outline:2px solid var(--accent);outline-offset:4px;}
+.studio-workspace .studio-trim {width:14px;height:100%;min-height:0;top:0;bottom:0;border-radius:0;cursor:ew-resize;background:transparent;color:var(--text);}
+.studio-workspace .studio-clip-select {touch-action:none;user-select:none;cursor:grab;padding:8px 15px;}
+.studio-workspace .studio-clip-select:active {cursor:grabbing;}
+.studio-edit-clip.selected {outline:2px solid var(--accent);outline-offset:-2px;}
+.studio-edit-clip.drop-target {border-left:5px solid var(--accent);}
+.studio-ruler {position:relative;height:28px;touch-action:none;cursor:crosshair;}
+.studio-ruler span {pointer-events:none;}
+.studio-edit-clips {padding-top:0;}
+.studio-timeline-tail {flex-shrink:0;background:repeating-linear-gradient(135deg,transparent,transparent 10px,#8881 10px,#8881 11px);}
+.studio-timeline-zoom {max-width:240px;}
+.studio-clip-menu {flex-basis:100%;border:1px solid var(--line);border-radius:12px;padding:10px;}
+.studio-clip-menu summary {cursor:pointer;font-weight:600;}
+.studio-autosave {font-size:13px;color:var(--muted);min-height:24px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+.studio-autosave [role=alert] {color:var(--text);}
+.studio-insert-browser {border:1px solid var(--line);padding:12px;border-radius:14px;}
+.studio-insert-grid {display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px;max-height:480px;overflow:auto;}
+.studio-insert-grid article {min-width:0;border:1px solid var(--line);padding:8px;border-radius:10px;}
+.studio-insert-grid small {display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.studio-insert-grid video {width:100%;height:170px;object-fit:contain;background:#000;}
+.studio-insert-grid button {font-size:12px;padding:8px;}
+@media(max-width:600px){.studio-timeline-toolbar button{padding:9px 12px;font-size:13px;}.studio-insert-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}

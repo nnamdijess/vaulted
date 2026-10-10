@@ -7,7 +7,7 @@ from sqlalchemy import select, or_
 from app.api.music import Database, require_record, lock_track_order
 from app.models.music import Song, SongVersion, Project, utc_now
 from app.models.studio import ContentProject, ContentLyricLine, ContentMedia, ContentClip, ContentRenderJob, AestheticCollection
-from app.schemas.studio import Create, Edit, Timing, Search, Draft, Replace, Favorite, CollectionInput, TextStyle, Timeline, LyricPreview
+from app.schemas.studio import Create, Edit, Timing, Search, Draft, Replace, Favorite, CollectionInput, TextStyle, Timeline, LyricPreview, EditorChanges
 from app.services.studio_fonts import FONT_DIR, FONT_FILES
 from app.services.studio_presets import RECIPES, STYLES
 from app.services.studio_storage import duration, content_path
@@ -38,7 +38,7 @@ def view(project, db):
         'project_id': song.project_id, 'cover_path': song.project.cover_path, 'version_name': version.version_name,
         'lines': [{'text': line.text, 'start_time': line.start_time, 'end_time': line.end_time} for line in project.lines],
         'clips': [{'id': clip.id, 'media_id': clip.media_id, 'start_time': clip.start_time, 'end_time': clip.end_time,
-                   'source_start': clip.source_start, 'framing': clip.framing, 'media': clip.media.metadata_json} for clip in project.clips],
+                   'source_start': clip.source_start, 'loop_source': clip.loop_source, 'framing': clip.framing, 'media': clip.media.metadata_json} for clip in project.clips],
         'jobs': [job_view(job) for job in project.jobs]}
 
 
@@ -348,11 +348,10 @@ def draft(identifier: int, data: Draft, db: Database):
         raise HTTPException(422, 'Select at least one clip.')
     project.clips.clear()
     elapsed = 0
-    for position in range(200):
+    for position, item in enumerate(media[:200]):
         if elapsed >= length:
             break
-        item = media[position % len(media)]
-        end = min(length, elapsed + 4)
+        end = min(length, elapsed + min(4, item.metadata_json['duration']))
         project.clips.append(ContentClip(media_id=item.id, position=position, start_time=elapsed, end_time=end))
         elapsed = end
     changed(project)
@@ -382,31 +381,47 @@ def replace(identifier: int, clip_id: int, data: Replace, db: Database):
         raise HTTPException(404, 'Clip not found')
     clip.media = media
     clip.source_start = 0
+    clip.loop_source = clip.end_time - clip.start_time > media.metadata_json['duration'] + 0.001
     changed(project)
     db.commit()
     return view(project, db)
 
 
+def apply_timeline(project, clips, db):
+    length = project.end_time - project.start_time
+    if sum(item.duration for item in clips) > length + 0.02:
+        raise HTTPException(422, 'Timeline exceeds the song section.')
+    for item in clips:
+        media = owned(db, ContentMedia, item.media_id)
+        available = media.metadata_json['duration'] - item.source_start
+        if available <= 0:
+            raise HTTPException(422, 'Source start must be within the original clip.')
+        if not item.loop_source and item.duration > available + 0.02:
+            raise HTTPException(422, 'This clip ends here. Use another clip to fill the remaining time.')
+    project.clips.clear()
+    elapsed = 0
+    for position, item in enumerate(clips):
+        end = round(elapsed + item.duration, 6)
+        project.clips.append(ContentClip(media_id=item.media_id, position=position, start_time=elapsed,
+            end_time=end, source_start=item.source_start, framing=item.framing.model_dump(), loop_source=item.loop_source))
+        elapsed = end
+
+
 @router.put('/projects/{identifier}/timeline')
 def save_timeline(identifier: int, data: Timeline, db: Database):
+    return save_editor(identifier, EditorChanges(revision=data.revision, clips=data.clips), db)
+
+
+@router.put('/projects/{identifier}/editor')
+def save_editor(identifier: int, data: EditorChanges, db: Database):
     lock_track_order(db)
     project = owned(db, ContentProject, identifier)
     if project.revision != data.revision:
-        raise HTTPException(409, 'This draft changed elsewhere. Reload before editing the timeline.')
-    length = project.end_time - project.start_time
-    if sum(item.duration for item in data.clips) > length + 0.02:
-        raise HTTPException(422, 'Timeline exceeds the song section. Shorten a clip before inserting more footage.')
-    for item in data.clips:
-        media = owned(db, ContentMedia, item.media_id)
-        if item.source_start >= media.metadata_json['duration']:
-            raise HTTPException(422, 'Source start must be within the original clip.')
-    project.clips.clear()
-    elapsed = 0
-    for position, item in enumerate(data.clips):
-        end = round(elapsed + item.duration, 6)
-        project.clips.append(ContentClip(media_id=item.media_id, position=position, start_time=elapsed,
-            end_time=end, source_start=item.source_start, framing=item.framing.model_dump()))
-        elapsed = end
+        raise HTTPException(409, 'This draft changed elsewhere. Reload to see that version; your pending edits have not overwritten it.')
+    if data.clips is not None:
+        apply_timeline(project, data.clips, db)
+    if data.text_style is not None:
+        project.text_style = data.text_style.model_dump()
     changed(project)
     db.commit()
     return view(project, db)

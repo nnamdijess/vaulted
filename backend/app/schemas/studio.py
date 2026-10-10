@@ -99,8 +99,10 @@ class Framing(Input):
 
 
 class TimelineClip(Input):
+    loop_source: bool = False
     media_id: int = Field(gt=0)
-    duration: float = Field(ge=1/30, le=60)
+    # Timeline boundaries are persisted to six decimal places.
+    duration: float = Field(ge=1/30 - 0.000001, le=60)
     source_start: float = Field(default=0, ge=0, le=600)
     framing: Framing = Field(default_factory=Framing)
 
@@ -114,3 +116,9 @@ class LyricPreview(Input):
     text: str = Field(max_length=500)
     style: TextStyle
     preset: Literal['minimal', 'large', 'lower', 'highlight'] = 'minimal'
+
+
+class EditorChanges(Input):
+    revision: int = Field(gt=0)
+    clips: list[TimelineClip] | None = Field(default=None, max_length=200)
+    text_style: TextStyle | None = None

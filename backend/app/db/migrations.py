@@ -12,6 +12,13 @@ def upgrade_local_database(engine: Engine) -> None:
             columns = {c['name'] for c in inspect(connection).get_columns('content_clips')}
             if 'framing' not in columns:
                 connection.exec_driver_sql("ALTER TABLE content_clips ADD COLUMN framing JSON NOT NULL DEFAULT '{}'")
+            if 'loop_source' not in columns:
+                connection.exec_driver_sql("ALTER TABLE content_clips ADD COLUMN loop_source BOOLEAN NOT NULL DEFAULT 0")
+                # Preserve already-saved long assignments; never alter old timing or renders.
+                if {'start_time', 'end_time', 'media_id', 'source_start'} <= columns and inspect(connection).has_table('content_media'):
+                    connection.exec_driver_sql("""UPDATE content_clips SET loop_source=1 WHERE
+                        end_time-start_time+source_start > (SELECT json_extract(metadata_json, '$.duration')
+                        FROM content_media WHERE content_media.id=content_clips.media_id) + 0.02""")
         if inspect(connection).has_table('content_projects'):
             columns = {c['name'] for c in inspect(connection).get_columns('content_projects')}
             if 'media_pool' not in columns:

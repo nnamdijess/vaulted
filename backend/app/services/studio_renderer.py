@@ -67,7 +67,7 @@ def render(job_id, snapshot, update_progress):
                 download_video(media['video_url'], stock)
             filename = f'clip-{index}.mp4'
             treatment = ',hue=s=0' if snapshot.get('render_aesthetic', snapshot['aesthetic']) == 'black-white' else ''
-            command(['-protocol_whitelist', 'file,pipe', '-stream_loop', '-1', '-ss', str(clip['source_start']), '-f', 'mov', '-i', str(stock),
+            command(['-protocol_whitelist', 'file,pipe', *(['-stream_loop', '-1'] if clip.get('loop_source', True) else []), '-ss', str(clip['source_start']), '-f', 'mov', '-i', str(stock),
                      '-t', str(clip['end_time'] - clip['start_time']), '-an',
                      '-vf', framing_filter(clip.get('framing') or {}) + f',setsar=1,fps=30{treatment}',
                      '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-pix_fmt', 'yuv420p', '-threads', '2', filename], work)

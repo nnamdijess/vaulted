@@ -1,7 +1,7 @@
 import { expect } from '@playwright/test';
 import { test, wav } from './fixtures';
 
-test('Studio text panel previews, cancels and saves color font and alignment', async ({ page, request }, testInfo) => {
+test('Studio text panel automatically saves color font and alignment', async ({ page, request }, testInfo) => {
   const music = await (await request.post('http://127.0.0.1:8011/api/projects', { data: { name: 'Text styles' } })).json();
   const songs = await (await request.post(`http://127.0.0.1:8011/api/projects/${music.id}/tracks`, { multipart: { files: { name: 'Text.wav', mimeType: 'audio/wav', buffer: wav() } } })).json();
   const draft = await (await request.post('http://127.0.0.1:8011/api/studio/projects', { data: { title: 'Style draft', song_version_id: songs[0].latest_version_id } })).json();
@@ -15,7 +15,7 @@ test('Studio text panel previews, cancels and saves color font and alignment', a
   await expect(sample).toHaveCSS('color', 'rgb(255, 107, 174)');
   await expect(sample).toHaveCSS('text-align', 'right');
   await expect.poll(() => page.evaluate(async () => (await document.fonts.load('20px "Vaulted Anton"')).length)).toBe(1);
-  await panel.getByRole('button', { name: 'Cancel style changes' }).click();
+  await panel.getByRole('button', { name: 'White text' }).click();
   await expect(sample).toHaveCSS('color', 'rgb(255, 255, 255)');
   await panel.getByLabel('Custom text color').fill('#12abef');
   await panel.getByRole('button', { name: 'Anton', exact: true }).click();
@@ -28,8 +28,7 @@ test('Studio text panel previews, cancels and saves color font and alignment', a
   await expect(page.getByRole('status').filter({ hasText: 'Draft saved' })).toBeVisible();
   await page.getByRole('button', { name: '4. Visuals', exact: true }).click();
   await expect(panel.getByRole('button', { name: 'Align left' })).toHaveAttribute('aria-pressed', 'true');
-  await panel.getByRole('button', { name: 'Save text style' }).click();
-  await expect(panel.getByRole('status')).toHaveText('Text style saved.');
+  await expect(page.locator('.studio-autosave')).toHaveText('Saved');
   const saved = await (await request.get(`http://127.0.0.1:8011/api/studio/projects/${draft.id}`)).json();
   expect(saved.text_style).toEqual({ font_size: 96, bold: false, italic: false, underline: false, color: '#12abef', font: 'anton', align: 'left', letter_spacing: 0.1, text_width: 60 });
   await page.reload();
@@ -40,8 +39,7 @@ test('Studio text panel previews, cancels and saves color font and alignment', a
   for (const [label, font] of [['Abel', 'abel'], ['Mono', 'mono'], ['Bebas Neue', 'bebas'], ['Montserrat', 'montserrat'], ['Playfair Display', 'playfair'], ['Oswald', 'oswald'], ['Unbounded', 'unbounded'], ['Josefin Sans', 'josefin']]) {
     await panel.getByRole('button', { name: label, exact: true }).click();
     await expect.poll(() => page.evaluate(async family => (await document.fonts.load(`20px "Vaulted ${family}"`)).length, label)).toBe(1);
-    await panel.getByRole('button', { name: 'Save text style' }).click();
-    await expect(panel.getByRole('status')).toHaveText('Text style saved.');
+    await expect(page.locator('.studio-autosave')).toHaveText('Saved');
     await page.reload();
     await page.getByRole('button', { name: '4. Visuals', exact: true }).click();
     await expect(panel.getByRole('button', { name: label, exact: true })).toHaveAttribute('aria-pressed', 'true');
@@ -51,8 +49,7 @@ test('Studio text panel previews, cancels and saves color font and alignment', a
   await expect(sample).toHaveCSS('font-weight', '700');
   await expect(sample).toHaveCSS('font-style', 'italic');
   await expect(sample).toHaveCSS('text-decoration-line', 'underline');
-  await panel.getByRole('button', { name: 'Save text style' }).click();
-  await expect(panel.getByRole('status')).toHaveText('Text style saved.');
+  await expect(page.locator('.studio-autosave')).toHaveText('Saved');
   await page.reload();
   await page.getByRole('button', { name: '4. Visuals', exact: true }).click();
   for (const name of ['Bold', 'Italic', 'Underline']) await expect(panel.getByRole('button', { name, exact: true })).toHaveAttribute('aria-pressed', 'true');

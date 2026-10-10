@@ -2,8 +2,8 @@
 import { TextStyle, studioFonts, lyricCss } from '@/lib/studio-text-style';
 
 const colors = { White: '#FFFFFF', Black: '#000000', Yellow: '#FFFF80', Orange: '#FF9F43', Pink: '#FF6BAE', Blue: '#59B5FF', Green: '#B7F56B', Purple: '#BB91FF' };
-export function TextStylePanel({ value, onChange, dirty, disabled, save, cancel, saved }: {
-  value: TextStyle; onChange: (value: TextStyle) => void; dirty: boolean; disabled: boolean; save: () => void; cancel: () => void; saved: boolean;
+export function TextStylePanel({ value, onChange, disabled }: {
+  value: TextStyle; onChange: (value: TextStyle) => void; disabled: boolean;
 }) {
   return <aside className="studio-text-panel" aria-label="Text styling">
     <h3>Text style</h3><p>Applies to all lyrics in this draft.</p>
@@ -37,9 +37,6 @@ export function TextStylePanel({ value, onChange, dirty, disabled, save, cancel,
       <small>Narrow the text area for shorter lines and more space around your lyrics.</small>
     </fieldset>
     <div className="studio-text-sample" style={lyricCss(value)} aria-label="Text style sample">Your lyrics, your style</div>
-    <div className="studio-actions"><button disabled={disabled || !dirty} onClick={save}>Save text style</button>
-      {dirty && <button className="secondary" disabled={disabled} onClick={cancel}>Cancel style changes</button>}
-    </div>
-    <p role="status">{dirty ? 'Previewing unsaved changes.' : saved ? 'Text style saved.' : 'Changes preview instantly. Save to include them in exports.'}</p>
+    <p>Changes save automatically.</p>
   </aside>;
 }

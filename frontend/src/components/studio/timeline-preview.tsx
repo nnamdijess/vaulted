@@ -14,16 +14,16 @@ function VideoSlot({ clip, time, active, playing, pause }: { clip?: Clip; time: 
   useEffect(() => {
     const el=video.current; if(!el || !clip || el.readyState<1) return;
     if(!active) {el.pause();return;}
-    const position=sourceTime(target,clip.source_start,el.duration);
+    const position=clip.loop_source ? sourceTime(target,clip.source_start,el.duration) : Math.min(target+clip.source_start,Math.max(0,el.duration-.01));
     // Only correct substantial drift; normal playback runs in the media engine.
     if(Math.abs(el.currentTime-position) > (playing ? .6 : .02)) el.currentTime=position;
     if(playing && el.paused) void el.play().catch(e=>{if(e.name!=='AbortError'){setFailed(true);pause();}});
     if(!playing) el.pause();
   },[target,playing,active,clip,pause]);
-  return <><video ref={video} src={clip?.media.preview_url} muted playsInline loop preload={clip ? 'auto' : 'none'}
+  return <><video ref={video} src={clip?.media.preview_url} muted playsInline loop={!!clip?.loop_source} preload={clip ? 'auto' : 'none'}
     aria-label={active ? 'Draft preview' : 'Preloaded next clip'} aria-hidden={!active}
     style={{...videoFrame(dimensions.width,dimensions.height,clip?.framing),visibility:active?'visible':'hidden'}}
-    onLoadedMetadata={e=>{const el=e.currentTarget;setDimensions({width:el.videoWidth,height:el.videoHeight});setFailed(false);el.currentTime=sourceTime(target,clip?.source_start??0,el.duration);if(active&&playing) void el.play().catch(()=>pause());}}
+    onLoadedMetadata={e=>{const el=e.currentTarget;setDimensions({width:el.videoWidth,height:el.videoHeight});setFailed(false);el.currentTime=clip?.loop_source ? sourceTime(target,clip.source_start,el.duration) : Math.min(target+(clip?.source_start??0),Math.max(0,el.duration-.01));if(active&&playing) void el.play().catch(()=>pause());}}
     onError={()=>{if(clip&&active){setFailed(true);pause();}}}/>
     {failed&&active&&<div className="studio-video-error">Footage unavailable.<button onClick={()=>{setFailed(false);video.current?.load();}}>Retry video</button></div>}</>;
 }

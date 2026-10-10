@@ -166,6 +166,25 @@ class StudioTest(unittest.TestCase):
         summary = lambda value: sorted((c['end_time']-c['start_time'], c['source_start'], c['framing']['zoom']) for c in value['clips'])
         self.assertEqual(summary(saved), summary(shuffled))
 
+    def test_editor_autosave_is_atomic_owned_and_revision_checked(self):
+        draft = self.draft()
+        clip = draft['clips'][0]
+        payload = {'revision': draft['revision'], 'clips': [{'media_id': clip['media_id'], 'duration': 2, 'source_start': 0}],
+            'text_style': {'font': 'anton', 'color': '#FFFFFF', 'align': 'left', 'font_size': 90}}
+        self.assertEqual(self.other.put(self.url + '/editor', json=payload).status_code, 404)
+        self.assertEqual(self.public.put(self.url + '/editor', json=payload).status_code, 401)
+        saved = self.client.put(self.url + '/editor', json=payload)
+        self.assertEqual(saved.status_code, 200, saved.text)
+        self.assertEqual(saved.json()['text_style']['font_size'], 90)
+        self.assertEqual(saved.json()['clips'][0]['end_time'], 2)
+        self.assertEqual(self.client.put(self.url + '/editor', json=payload).status_code, 409)
+        payload['revision'] = saved.json()['revision']
+        payload['clips'][0]['source_start'] = 4.5  # Only half a second remains in this source.
+        payload['text_style']['font_size'] = 100
+        self.assertEqual(self.client.put(self.url + '/editor', json=payload).status_code, 422)
+        self.assertEqual(self.client.get(self.url).json()['text_style']['font_size'], 90)
+        self.assertEqual(self.client.get(self.url).json()['clips'][0]['end_time'], 2)
+
     def test_lyric_raster_matches_export_coordinates_and_size(self):
         from PIL import Image
         from app.services.studio_renderer import subtitles
@@ -196,8 +215,16 @@ class StudioTest(unittest.TestCase):
         self.assertEqual(self.client.get(item['preview_url'], headers={'Range': 'bytes=0-31'}).status_code, 206)
         self.edit(lyrics_text='')
         draft = self.client.post(self.url + '/draft', json={'media_ids': [item['id']]}).json()
+        self.assertAlmostEqual(draft['clips'][0]['end_time'], 0.5)
+        self.assertFalse(draft['clips'][0]['loop_source'])
+        self.assertEqual(len(draft['clips']), 1)  # Do not silently repeat the pool.
+        self.assertEqual(self.client.post(self.url + '/renders').status_code, 422)
+        longer = self.draft()
+        self.edit(lyrics_text='')
+        draft = self.client.put(self.url + f"/clips/{longer['clips'][0]['id']}", json={'media_id': item['id']}).json()
         self.assertAlmostEqual(draft['clips'][0]['end_time'], 3)
-        body = {'revision': draft['revision'], 'clips': [{'media_id': item['id'], 'duration': 3, 'source_start': 0.1,
+        self.assertTrue(draft['clips'][0]['loop_source'])
+        body = {'revision': draft['revision'], 'clips': [{'media_id': item['id'], 'duration': 3, 'source_start': 0.1, 'loop_source': True,
             'framing': {'mode': 'fit', 'zoom': 1, 'x': 0, 'y': 0.5}}]}
         self.assertEqual(self.client.put(self.url + '/timeline', json=body).status_code, 200)
         job = self.client.post(self.url + '/renders').json()
@@ -538,3 +565,29 @@ class StudioTest(unittest.TestCase):
         restored = self.client.get(self.url).json()
         self.assertEqual(restored['media_pool'], [])
         self.assertEqual(restored['title'], self.project['title'])
+
+    def test_loop_migration_preserves_old_stretched_assignments(self):
+        from app.db.migrations import upgrade_local_database
+        draft = self.draft()
+        clip_id = draft['clips'][0]['id']
+        with self.engine.begin() as connection:
+            connection.exec_driver_sql('UPDATE content_clips SET end_time=1000 WHERE id=?', (clip_id,))
+            connection.exec_driver_sql('ALTER TABLE content_clips DROP COLUMN loop_source')
+        upgrade_local_database(self.engine)
+        upgrade_local_database(self.engine)
+        restored = self.client.get(self.url).json()['clips'][0]
+        self.assertTrue(restored['loop_source'])
+        self.assertEqual(restored['end_time'], 1000)
+
+    def test_one_frame_clip_survives_repeated_timeline_saves(self):
+        draft = self.draft()
+        media_id = draft['clips'][0]['media_id']
+        duration = 1 / 30
+        for _ in range(3):
+            response = self.client.put(self.url + '/editor', json={'revision': draft['revision'],
+                'clips': [{'media_id': media_id, 'duration': 2.9}, {'media_id': media_id, 'duration': duration}]})
+            self.assertEqual(response.status_code, 200, response.text)
+            draft = response.json()
+            last = draft['clips'][-1]
+            duration = last['end_time'] - last['start_time']
+            self.assertAlmostEqual(duration, 1 / 30, places=6)

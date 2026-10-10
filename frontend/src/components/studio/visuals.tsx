@@ -4,6 +4,7 @@ import { api, postJson } from '@/lib/api';
 import { ContentProject, Media } from '@/lib/studio';
 import { ClipLibraryTools, ClipDetails } from './clip-library';
 import { DraftTimeline } from './draft-timeline';
+import { useEditorAutosave } from './use-editor-autosave';
 import { MediaCredit, ProviderSelect } from './media-provider';
 import { ClipPreview } from './clip-preview';
 import { TextStylePanel } from './text-style-panel';
@@ -23,14 +24,14 @@ export function Visuals({ project, setProject, disabled: baseDisabled, pause, ru
   const [browsing, setBrowsing] = useState(false);
   const browser = useRef<HTMLDivElement>(null);
   const draft = useRef<HTMLDivElement>(null);
-  const [styleSaved, setStyleSaved] = useState(false);
+  const autosave = useEditorAutosave(project, setProject, onTimelineDirty, () => setPendingStyle(null));
   useEffect(() => {
     if (tab !== 'library') return;
     let active = true;
     void api<Media[]>('/studio/media/favorites').then(items => { if (active) { setResults(items); setReviewed(true); } }).catch(error => { if (active) setLibraryError(error.message); });
     return () => { active = false; };
   }, [tab]);
-  const textStyle = pendingStyle ?? resolveTextStyle(project.text_style, project.lyric_style);
+  const textStyle = autosave.edits.text_style ?? pendingStyle ?? resolveTextStyle(project.text_style, project.lyric_style);
   function closeBrowser() {
     pause(); setReplace(null); setBrowsing(false);
     requestAnimationFrame(() => {
@@ -64,15 +65,11 @@ export function Visuals({ project, setProject, disabled: baseDisabled, pause, ru
   }
   const shown = tab === 'library' ? results.filter(item => librarySource === 'all' || (librarySource === 'upload' ? item.provider === 'upload' : item.provider !== 'upload')) : results;
   return <section className="studio-panel studio-visuals"><h2>4. Visuals</h2><p>Build with your clips, or discover footage from <a href="https://pixabay.com/" target="_blank" rel="noreferrer">Pixabay</a> and <a href="https://www.pexels.com/" target="_blank" rel="noreferrer">Pexels</a>. Select a timeline clip to adjust its crop and position in the vertical frame.</p>
+    <div className="studio-autosave" role="status" aria-live="polite">{autosave.status === 'saved' ? 'Saved' : autosave.status === 'error' ? 'Not saved' : 'Saving…'}{autosave.error && <><span role="alert">{autosave.error}</span><button onClick={autosave.retry}>Retry saving</button></>}</div>
     <div className="studio-visual-layout">
-      {!!project.clips.length ? <div ref={draft}><DraftTimeline onDirty={onTimelineDirty} onSaved={setProject} project={project} textStyle={textStyle} disabled={baseDisabled} onReplace={item => { setReplace(item.id); openBrowser(); }} /></div>
-        : <div className="studio-empty-draft"><h3>Your draft</h3><p>Generate a draft or choose footage to preview your lyrics over video.</p></div>}
-      <TextStylePanel value={textStyle} dirty={pendingStyle !== null} disabled={disabled} saved={styleSaved}
-        onChange={value => { setPendingStyle(value); setStyleSaved(false); }} cancel={() => setPendingStyle(null)}
-        save={() => void run(async () => {
-          const updated = await api<ContentProject>(`/studio/projects/${project.id}/text-style`, { ...postJson(textStyle), method: 'PUT' });
-          setProject(updated); setPendingStyle(null); setStyleSaved(true);
-        })} />
+      <div ref={draft}><DraftTimeline clips={autosave.edits.clips ?? project.clips} onEdit={clips => autosave.queue({ clips })} saving={timelineDirty} project={project} textStyle={textStyle} disabled={baseDisabled} onReplace={item => { setReplace(item.id); openBrowser(); }} /></div>
+      <TextStylePanel value={textStyle} disabled={baseDisabled}
+        onChange={value => { setPendingStyle(value); autosave.queue({ text_style: value }); }} />
     </div>
     <div className="studio-actions"><button disabled={disabled} onClick={() => { openBrowser(); void run(review); }}>Review Media</button>
     {(!!project.clips.length || !!project.media_pool?.length) && <button disabled={disabled} onClick={() => void run(() => generate('reroll'))}>Reroll Visuals</button>}
@@ -99,7 +96,7 @@ export function Visuals({ project, setProject, disabled: baseDisabled, pause, ru
     {replace !== null && <p role="status">Choose footage below for section {project.clips.findIndex(item => item.id === replace) + 1}. Its timing will stay the same. <button onClick={closeBrowser}>Cancel replacement</button></p>}
     {reviewed && !shown.length && <p>No clips found. Try another search.</p>}
     {replace === null && <>
-      <p role="status">{selected.length} clips selected · Maximum 1,000. Drafts randomly choose from this pool until the section is full.</p>
+      <p role="status">{selected.length} clips selected · Maximum 1,000. Drafts randomly choose from this pool without repeating clips. Add more footage if the section is not filled.</p>
       <div className="studio-actions"><button aria-pressed={shown.length > 0 && shown.every(item => selected.includes(item.id))} disabled={disabled || !shown.length || new Set([...selected, ...shown.map(item => item.id)]).size > 1000}
         onClick={() => setSelected(current => [...new Set([...(current ?? []), ...shown.map(item => item.id)])])}>Select all shown</button>
         <button className="secondary" disabled={disabled || !selected.length} onClick={() => setSelected([])}>Clear selection</button>
