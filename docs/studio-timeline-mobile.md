@@ -99,3 +99,11 @@ For very short clips, increase Timeline zoom or use the duration/source fields a
 - All 37 Playwright tests passed in one complete run. New coverage includes live end trimming on a full timeline, touch edge trimming/reordering, delayed overlapping font/timeline saves, failed-save retry, reload persistence, Space versus typing, playable insert previews, drag/drop insertion and Undo.
 - ESLint, TypeScript checks and the production build passed. A 390px mobile insertion-tray screenshot was inspected; actual iPhone testing remains outstanding.
 - New footage uses each source at most once per generated draft and stops at its natural duration (up to the existing four-second default per clip). A small selected pool can therefore leave a partial timeline; add more footage before exporting. Short replacements and migrated older stretched assignments retain looping explicitly.
+
+## Uploaded preview loading and reroll rotation
+
+Library cards now show posters without fetching video data. Play attaches a video source on demand; another preview, scrolling offscreen, or leaving the page releases it. Retry explicitly reloads a failed source. Authenticated uploaded video/poster responses release their database connection before streaming, while retaining ownership checks and byte-range support. Missing local files return 404 rather than a file-response server error.
+
+Each draft now keeps a bounded, private media-use history (an additive `media_history` JSON column). Generation prefers unseen and then least recently used candidates, so clearing and rerolling does not repeatedly return to the same small subset. This cannot provide variety beyond the selected pool.
+
+Validation: 41 backend tests, five focused browser tests (including a 50-card library, failed-request retry, offscreen unload, MP4/GIF touch playback, timeline/autosave), lint and production build with TypeScript passed. Ubuntu/Tailscale verification remains required after deploying the commit and restarting the backend and rebuilt frontend. No user media was modified or re-encoded.

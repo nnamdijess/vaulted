@@ -63,6 +63,7 @@ test('queued timeline and font autosaves retain newer edits; visual insertion, S
   const tray = page.getByRole('region', { name: 'Insert clips' });
   await expect(tray.locator('video')).toHaveCount(1);
   await tray.locator('video').scrollIntoViewIfNeeded();
+  await tray.getByRole('button', { name: `Play Clip ${media.id} preview` }).click();
   await expect.poll(() => tray.locator('video').evaluate((v: HTMLVideoElement) => v.videoWidth)).toBe(160);
   await tray.getByLabel('Find saved footage').fill('generic');
   await page.keyboard.press('Space');

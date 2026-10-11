@@ -119,8 +119,9 @@ test(`uploaded ${format} clips can be previewed, tagged, filtered and used in a 
   await expect(page.getByText('1 clips added to Saved clips.')).toBeVisible();
   const card = page.locator('.studio-media-grid article').first();
   await card.scrollIntoViewIfNeeded();
-  await expect.poll(() => card.locator('video').evaluate((v: HTMLVideoElement) => v.videoWidth)).toBe(160);
+  await expect(card.locator('video')).not.toHaveAttribute('src');
   await card.getByRole('button', { name: /^Play Preview/ }).tap();
+  await expect.poll(() => card.locator('video').evaluate((v: HTMLVideoElement) => v.videoWidth)).toBe(160);
   await expect(card.locator('video')).toHaveJSProperty('paused', false);
   await expect.poll(() => card.locator('video').evaluate((v: HTMLVideoElement) => v.currentTime)).toBeGreaterThan(0.1);
   await card.getByRole('button', { name: /^Pause Preview/ }).tap();

@@ -21,6 +21,8 @@ def upgrade_local_database(engine: Engine) -> None:
                         FROM content_media WHERE content_media.id=content_clips.media_id) + 0.02""")
         if inspect(connection).has_table('content_projects'):
             columns = {c['name'] for c in inspect(connection).get_columns('content_projects')}
+            if 'media_history' not in columns:
+                connection.exec_driver_sql("ALTER TABLE content_projects ADD COLUMN media_history JSON NOT NULL DEFAULT '[]'")
             if 'media_pool' not in columns:
                 connection.exec_driver_sql("ALTER TABLE content_projects ADD COLUMN media_pool JSON NOT NULL DEFAULT '[]'")
             if 'text_style' not in columns:

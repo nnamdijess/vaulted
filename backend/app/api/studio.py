@@ -274,7 +274,12 @@ def uploaded_video(identifier: int, db: Database):
     media = owned(db, ContentMedia, identifier)
     if media.provider != 'upload':
         raise HTTPException(404, 'Upload not found')
-    return FileResponse(content_path(media.metadata_json['local_path']), media_type='video/mp4', headers={'Cache-Control': 'private, no-store'})
+    path = content_path(media.metadata_json['local_path'])
+    # Authorization is complete; slow/range streams must not occupy the DB pool.
+    db.close()
+    if not path.is_file():
+        raise HTTPException(404, 'Uploaded video file is missing from this server.')
+    return FileResponse(path, media_type='video/mp4', headers={'Cache-Control': 'private, no-store'})
 
 
 @router.get('/media/{identifier}/poster')
@@ -282,7 +287,11 @@ def uploaded_poster(identifier: int, db: Database):
     media = owned(db, ContentMedia, identifier)
     if media.provider != 'upload':
         raise HTTPException(404, 'Upload not found')
-    return FileResponse(content_path(media.metadata_json['local_path']).with_name('poster.jpg'), media_type='image/jpeg', headers={'Cache-Control': 'private, no-store'})
+    path = content_path(media.metadata_json['local_path']).with_name('poster.jpg')
+    db.close()
+    if not path.is_file():
+        raise HTTPException(404, 'Preview image is missing from this server.')
+    return FileResponse(path, media_type='image/jpeg', headers={'Cache-Control': 'private, no-store'})
 
 
 @router.put('/media/{identifier}/details')
@@ -342,6 +351,13 @@ def draft(identifier: int, data: Draft, db: Database):
         db.refresh(project)
         return view(project, db)
     ids = list(dict.fromkeys(ids))
+    # Least recently used sources first, with random ordering among unseen clips.
+    # Persist across rerolls and clear-draft, rather than just excluding the last draft.
+    current = list(dict.fromkeys(clip.media_id for clip in project.clips))
+    history = [value for value in project.media_history if value not in current] + current
+    rank = {value: index for index, value in enumerate(history)}
+    random.shuffle(ids)
+    ids.sort(key=lambda value: rank.get(value, -1))
     media = [owned(db, ContentMedia, value) for value in ids]
     length = project.end_time - project.start_time
     if not media:
@@ -354,6 +370,8 @@ def draft(identifier: int, data: Draft, db: Database):
         end = min(length, elapsed + min(4, item.metadata_json['duration']))
         project.clips.append(ContentClip(media_id=item.id, position=position, start_time=elapsed, end_time=end))
         elapsed = end
+    used = [clip.media_id for clip in project.clips]
+    project.media_history = ([value for value in history if value not in used] + used)[-2000:]
     changed(project)
     project.status = 'ready'
     db.commit()

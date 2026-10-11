@@ -591,3 +591,35 @@ class StudioTest(unittest.TestCase):
             last = draft['clips'][-1]
             duration = last['end_time'] - last['start_time']
             self.assertAlmostEqual(duration, 1 / 30, places=6)
+
+    def test_uploaded_stream_releases_database_before_response(self):
+        from types import SimpleNamespace
+        from unittest.mock import MagicMock
+        from app.api.studio import uploaded_video, uploaded_poster
+        from app.services.studio_storage import content_path
+        video = content_path('library/test/video.mp4')
+        video.parent.mkdir(parents=True)
+        video.write_bytes(b'test')
+        video.with_name('poster.jpg').write_bytes(b'poster')
+        db = MagicMock()
+        media = SimpleNamespace(provider='upload', metadata_json={'local_path': 'library/test/video.mp4'})
+        with patch('app.api.studio.owned', return_value=media), patch('app.api.studio.FileResponse') as response:
+            response.side_effect = lambda *args, **kwargs: self.assertTrue(db.close.called)
+            uploaded_video(1, db)
+            db.reset_mock()
+            uploaded_poster(1, db)
+
+    def test_rerolls_cycle_entire_pool_even_after_clear(self):
+        with patch('app.api.studio.PixabayProvider.search', return_value=self.footage()):
+            media = self.client.post('/api/studio/visuals/search', json={'aesthetic': 'nature', 'count': 3}).json()
+        ids = [item['id'] for item in media]
+        self.assertGreaterEqual(len(ids), 3)
+        used = []
+        for index in range(len(ids) * 2):
+            if index == 1:
+                self.client.delete(self.url + '/clips')
+            response = self.client.post(self.url + '/draft', json={'mode': 'selected', 'media_ids': ids})
+            self.assertEqual(response.status_code, 200, response.text)
+            used.append(response.json()['clips'][0]['media_id'])
+        self.assertEqual(set(used[:len(ids)]), set(ids))
+        self.assertEqual(set(used[len(ids):]), set(ids))
