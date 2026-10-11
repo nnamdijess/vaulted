@@ -7,6 +7,7 @@ import { DraftTimeline } from './draft-timeline';
 import { useEditorAutosave } from './use-editor-autosave';
 import { MediaCredit, ProviderSelect } from './media-provider';
 import { ClipPreview } from './clip-preview';
+import { StockSettings } from './stock-settings';
 import { TextStylePanel } from './text-style-panel';
 import { TextStyle, resolveTextStyle } from '@/lib/studio-text-style';
 
@@ -90,6 +91,7 @@ export function Visuals({ project, setProject, disabled: baseDisabled, pause, ru
     {libraryError && <p role="alert">{libraryError}</p>}
     {tab === 'library' && <label>Clip source<select aria-label="Clip source" value={librarySource} onChange={event => setLibrarySource(event.target.value)}><option value="all">Uploaded and saved</option><option value="upload">My uploads only</option><option value="stock">Saved stock only</option></select></label>}
     {tab === 'search' && <>
+      <StockSettings project={project} onSaved={setProject} disabled={disabled} run={run} />
       <ProviderSelect value={provider} disabled={disabled} onChange={value => { setProvider(value); setResults([]); setReviewed(false); setPage(1); }} />
       <form onSubmit={event => { event.preventDefault(); void run(() => search()); }}><label>Search visuals<input maxLength={100} value={query} onChange={event => setQuery(event.target.value)} placeholder="e.g. neon street, abstract texture" /></label><div className="studio-actions"><button disabled={disabled}>Search footage</button><button type="button" disabled={disabled} onClick={() => void run(() => search(page % 10 + 1))}>New stock results</button><button type="button" disabled={disabled} onClick={() => void run(() => generate('automatic'))}>Generate from stock</button></div></form>
     </>}

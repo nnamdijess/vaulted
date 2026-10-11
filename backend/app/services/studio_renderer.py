@@ -16,7 +16,8 @@ def subtitles(snapshot):
     style = snapshot['lyric_style']
     custom = snapshot.get('text_style') or {}
     size = custom.get('font_size') or (72 if style == 'large' else 48)
-    alignment = (1 if style == 'lower' else 4) + {'left': 0, 'center': 1, 'right': 2}.get(custom.get('align'), 1)
+    position = custom.get('position') or ('bottom' if style == 'lower' else 'middle')
+    alignment = {'top': 7, 'middle': 4, 'bottom': 1}[position] + {'left': 0, 'center': 1, 'right': 2}.get(custom.get('align'), 1)
     color = custom.get('color', '#FFFF80' if style == 'highlight' else '#FFFFFF').lstrip('#')
     primary = f'&H00{color[4:6]}{color[2:4]}{color[0:2]}'.upper()
     font = FONTS.get(custom.get('font'), 'DejaVu Sans')

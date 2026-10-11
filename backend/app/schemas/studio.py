@@ -32,6 +32,7 @@ class Timing(Input):
 
 
 class TextStyle(Input):
+    position: Literal['top', 'middle', 'bottom'] | None = None
     font_size: float | None = Field(default=None, ge=24, le=160)
     bold: bool = False
     italic: bool = False

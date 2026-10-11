@@ -56,7 +56,7 @@ class StudioTest(unittest.TestCase):
 
     def test_lyric_and_sync_edits_preserve_visuals(self):
         draft = self.draft()
-        style = {'font_size': None, 'bold': False, 'italic': False, 'underline': False, 'font': 'anton', 'color': '#FF9F43', 'align': 'right', 'letter_spacing': 0.1, 'text_width': 60}
+        style = {'position': None, 'font_size': None, 'bold': False, 'italic': False, 'underline': False, 'font': 'anton', 'color': '#FF9F43', 'align': 'right', 'letter_spacing': 0.1, 'text_width': 60}
         self.assertEqual(self.client.put(self.url + '/text-style', json=style).status_code, 200)
         updated = self.edit(lyrics_text='Edited line\nSecond line').json()
         self.assertEqual(updated['clips'], draft['clips'])
@@ -241,7 +241,15 @@ class StudioTest(unittest.TestCase):
         self.assertGreater(max(pixels), 20)
         self.assertEqual(self.other.delete(endpoint).status_code, 404)
         self.assertIn('attachment', self.client.get(endpoint + '/video?download=true').headers['content-disposition'])
+        self.assertEqual(self.other.get(endpoint + '/poster').status_code, 404)
+        self.assertEqual(self.public.get(endpoint + '/poster').status_code, 401)
+        poster = self.client.get(endpoint + '/poster')
+        self.assertEqual(poster.status_code, 200)
+        self.assertEqual(Image.open(io.BytesIO(poster.content)).width, 240)
+        with patch('app.services.render_poster.subprocess.run', side_effect=AssertionError('Use cached thumbnail')):
+            self.assertEqual(self.client.get(endpoint + '/poster').status_code, 200)
         self.assertEqual(self.client.delete(endpoint).status_code, 204)
+        self.assertFalse(path.with_suffix('.jpg').exists())
         self.assertFalse(path.exists())
         self.assertEqual(self.client.get(item['preview_url']).status_code, 200)
         self.assertEqual(self.client.get(self.url).status_code, 200)
@@ -323,7 +331,7 @@ class StudioTest(unittest.TestCase):
     def test_text_style_validation_ownership_snapshot_and_export(self):
         from app.services.studio_renderer import subtitles
         draft = self.draft()
-        style = {'font_size': None, 'bold': False, 'italic': False, 'underline': False, 'color': '#12ABEF', 'font': 'anton', 'align': 'right', 'letter_spacing': 0.1, 'text_width': 60}
+        style = {'position': None, 'font_size': None, 'bold': False, 'italic': False, 'underline': False, 'color': '#12ABEF', 'font': 'anton', 'align': 'right', 'letter_spacing': 0.1, 'text_width': 60}
         url = self.url + '/text-style'
         self.assertEqual(self.public.put(url, json=style).status_code, 401)
         self.assertEqual(self.other.put(url, json=style).status_code, 404)
@@ -623,3 +631,17 @@ class StudioTest(unittest.TestCase):
             used.append(response.json()['clips'][0]['media_id'])
         self.assertEqual(set(used[:len(ids)]), set(ids))
         self.assertEqual(set(used[len(ids):]), set(ids))
+
+    def test_lyric_vertical_positions_match_raster_and_persist(self):
+        from PIL import Image
+        positions = []
+        for position in ('top', 'middle', 'bottom'):
+            style = {'color': '#FFFFFF', 'font': 'default', 'align': 'center', 'position': position}
+            saved = self.client.put(self.url + '/text-style', json=style)
+            self.assertEqual(saved.status_code, 200)
+            self.assertEqual(self.client.get(self.url).json()['text_style']['position'], position)
+            png = self.client.post(self.url + '/lyric-preview', json={'text': 'Position', 'style': style, 'preset': 'minimal'})
+            self.assertEqual(png.status_code, 200)
+            positions.append(Image.open(io.BytesIO(png.content)).getbbox()[1])
+        self.assertLess(positions[0], positions[1])
+        self.assertLess(positions[1], positions[2])

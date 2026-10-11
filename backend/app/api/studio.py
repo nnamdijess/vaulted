@@ -464,6 +464,7 @@ def delete_render(identifier: int, job_id: int, db: Database):
             raise HTTPException(409, 'Unexpected render path; file was not deleted.')
         try:
             expected.unlink(missing_ok=True)
+            expected.with_suffix('.jpg').unlink(missing_ok=True)
         except OSError:
             raise HTTPException(503, 'Could not remove this file. Try again.') from None
     db.delete(job)
@@ -505,13 +506,34 @@ def render_status(identifier: int, job_id: int, db: Database):
     return job_view(job)
 
 
+@router.get('/projects/{identifier}/renders/{job_id}/poster')
+def export_poster(identifier: int, job_id: int, db: Database):
+    project = owned(db, ContentProject, identifier)
+    job = next((job for job in project.jobs if job.id == job_id), None)
+    if not job or job.status != 'completed' or not job.output_path:
+        raise HTTPException(404, 'Export not found')
+    path = content_path(job.output_path)
+    db.close()
+    if not path.is_file():
+        raise HTTPException(404, 'Export not found')
+    from app.services.render_poster import render_poster
+    import subprocess
+    try:
+        poster = render_poster(path)
+    except (OSError, RuntimeError, subprocess.SubprocessError):
+        raise HTTPException(503, 'Thumbnail unavailable. You can still open the video.') from None
+    return FileResponse(poster, media_type='image/jpeg', headers={'Cache-Control': 'private, no-cache'})
+
+
 @router.get('/projects/{identifier}/renders/{job_id}/video')
 def render_video(identifier: int, job_id: int, db: Database, download: bool = False):
     project = owned(db, ContentProject, identifier)
     job = next((job for job in project.jobs if job.id == job_id), None)
     if not job or job.status != 'completed' or not job.output_path or not content_path(job.output_path).is_file():
         raise HTTPException(404, 'Export not found')
-    return FileResponse(content_path(job.output_path), media_type='video/mp4', filename=f'vaulted-studio-{job.id}.mp4',
+    path = content_path(job.output_path)
+    db.close()
+    return FileResponse(path, media_type='video/mp4', filename=f'vaulted-studio-{job_id}.mp4',
                         content_disposition_type='attachment' if download else 'inline')
 
 

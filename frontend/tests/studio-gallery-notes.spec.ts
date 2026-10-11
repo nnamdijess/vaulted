@@ -1,0 +1,53 @@
+import { expect } from '@playwright/test';
+import { test, wav, png } from './fixtures';
+
+test('recent exports are thumbnail cards with all-exports navigation and on-demand video', async ({page},testInfo)=>{
+ await page.route('**/api/studio/projects',route=>route.fulfill({json:[{id:9,title:'Demo export',song_title:'Demo',status:'completed',project_id:1,cover_path:null,jobs:[1,5,3,2,4].map(id=>({id,status:'completed'}))}]}));
+ await page.route('**/renders/*/poster',route=>route.fulfill({contentType:'image/png',body:png}));
+ await page.goto('/studio');
+ const gallery=page.getByRole('region',{name:'Completed exports'});
+ await expect(gallery.locator('.studio-render-card')).toHaveCount(3);
+ await expect(gallery.getByRole('button',{name:'Preview export 5',exact:true})).toBeVisible();
+ await expect(gallery.getByRole('button',{name:'Preview export 1',exact:true})).toHaveCount(0);
+ await expect(page.locator('video')).toHaveCount(0);
+ await page.getByRole('button',{name:'View all exports (5) →',exact:true}).click();
+ await expect(page.getByRole('dialog',{name:'All exports'}).locator('.studio-render-card')).toHaveCount(5);
+ await page.getByRole('button',{name:'Close dialog'}).click();
+ await page.setViewportSize({width:390,height:844});
+ await gallery.scrollIntoViewIfNeeded();
+ await page.screenshot({path:testInfo.outputPath('exports-mobile.png')});
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await gallery.getByRole('button',{name:'Preview export 5',exact:true}).click();
+ await expect(page.getByRole('dialog',{name:'Export 5'}).locator('video')).toHaveAttribute('src','/api/studio/projects/9/renders/5/video');
+ await page.keyboard.press('Escape');
+ await expect(page.getByRole('dialog')).toHaveCount(0);
+});
+
+test('lyrics popup edits shared song notes without overwriting existing notes or changing lyrics silently',async({page,request})=>{
+ const base='http://127.0.0.1:8011/api';
+ const music=await(await request.post(`${base}/projects`,{data:{name:'Notes'}})).json();
+ const [song]=await(await request.post(`${base}/projects/${music.id}/tracks`,{multipart:{files:{name:'Demo.wav',mimeType:'audio/wav',buffer:wav()}}})).json();
+ await request.patch(`${base}/songs/${song.id}`,{data:{notes:'Verse one'}});
+ const draft=await(await request.post(`${base}/studio/projects`,{data:{title:'Notes draft',song_version_id:song.latest_version_id}})).json();
+ await page.goto(`/studio/${draft.id}`);
+ await expect(page.getByRole('link',{name:'Back to Studio'})).toContainText('←');
+ await page.getByRole('button',{name:'2. Lyrics',exact:true}).click();
+ await expect(page.getByRole('combobox',{name:'Aesthetic',exact:true})).toHaveCount(0);
+ await expect(page.getByRole('combobox',{name:'Lyric style',exact:true})).toHaveCount(0);
+ await page.getByRole('textbox',{name:'Lyrics',exact:true}).fill('Verse two');
+ await page.getByRole('button',{name:'Song notes',exact:true}).click();
+ const dialog=page.getByRole('dialog',{name:'Song notes'});
+ await expect(dialog.getByRole('textbox',{name:'Song notes'})).toHaveValue('Verse one');
+ await dialog.getByRole('button',{name:'Append draft lyrics'}).click();
+ await dialog.getByRole('button',{name:'Save song notes'}).click();
+ await expect(dialog).toHaveCount(0);
+ expect((await(await request.get(`${base}/songs/${song.id}`)).json()).notes).toBe('Verse one\n\nVerse two');
+ await expect(page.getByRole('textbox',{name:'Lyrics',exact:true})).toHaveValue('Verse two');
+ await page.getByRole('button',{name:'Song notes',exact:true}).click();
+ page.once('dialog',d=>d.accept());
+ await dialog.getByRole('button',{name:'Use notes as draft lyrics'}).click();
+ await dialog.getByRole('button',{name:'Cancel',exact:true}).click();
+ await expect(page.getByRole('textbox',{name:'Lyrics',exact:true})).toHaveValue('Verse one\n\nVerse two');
+ await page.getByRole('button',{name:'Save draft',exact:true}).click();
+ await expect(page.getByText('Draft saved',{exact:true})).toBeVisible();
+});

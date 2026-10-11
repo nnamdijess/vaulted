@@ -75,7 +75,7 @@ Test both Safari and the installed home-screen web app over the existing HTTPS T
 - Drag/reorder and trim both edges; scroll the timeline separately. Pinch/drag framing and compare Fit/Fill in landscape and portrait clips. Wait for Saved, leave, reload and verify.
 - Assign a subsecond GIF to a longer section; check loops, seeking, clip transitions and audio sync. Last 3s must stop at the selected boundary.
 - Export a mixed sequence with noncentral crops and multiline large text. Compare preview framing and text with the MP4.
-- Prepare then Save / Share MP4; try Save to Files, cancel, and repeat. Check whether Photos is offered. Use the separate-tab fallback and verify Studio remains available.
+- Open the share icon, wait for the MP4, then tap Share video; try Save to Files, cancel, and repeat. Check whether Photos is offered. Use the separate-tab fallback and verify Studio remains available.
 - Play private and shared albums, lock the phone, verify artwork/title changes and play/pause/previous/next/seek. iOS may ignore or cache artwork despite correct browser metadata; browser automation cannot establish system lock-screen behavior.
 - Delete a disposable export, cancel another deletion, and confirm source clips/draft still load.
 
@@ -107,3 +107,11 @@ Library cards now show posters without fetching video data. Play attaches a vide
 Each draft now keeps a bounded, private media-use history (an additive `media_history` JSON column). Generation prefers unseen and then least recently used candidates, so clearing and rerolling does not repeatedly return to the same small subset. This cannot provide variety beyond the selected pool.
 
 Validation: 41 backend tests, five focused browser tests (including a 50-card library, failed-request retry, offscreen unload, MP4/GIF touch playback, timeline/autosave), lint and production build with TypeScript passed. Ubuntu/Tailscale verification remains required after deploying the commit and restarting the backend and rebuilt frontend. No user media was modified or re-encoded.
+
+## Compact exports, shared notes, and lyric placement
+
+Completed exports show the latest three thumbnail cards, with an All exports dialog paginated in groups of twelve. Thumbnails are generated on demand, cached beside each MP4, and protected by the same ownership checks. Generation is limited to one FFmpeg thumbnail at a time per backend process. Cards load no video until preview is opened; sharing loads the chosen MP4 only after tapping its icon. The share dialog retains the second user gesture required by mobile sharing and a direct download fallback. Delete removes the export and cached thumbnail, preserving source media and the draft.
+
+Song notes in Lyrics edits the existing Library song notes. Append draft lyrics preserves earlier notes; using notes as draft lyrics requires confirmation and a subsequent draft save. Aesthetic controls now live under Visuals > Search > Stock footage settings. Lyric position replaces formatting buttons with Top/Middle/Bottom, retains horizontal alignment, and autosaves with the existing text editor. Preview and MP4 export share libass placement. Legacy formatting values are preserved.
+
+Validation: all 42 backend tests and all 40 browser tests passed, including thumbnail authorization/cache/deletion, latest-three gallery navigation, notes persistence, sharing, and saved vertical placement. ESLint and the production build with TypeScript passed. A mobile gallery screenshot was reviewed; native iPhone sharing and Ubuntu performance still require deployment verification.
