@@ -20,8 +20,10 @@ test('Studio text panel automatically saves color font and alignment', async ({ 
   await panel.getByLabel('Custom text color').fill('#12abef');
   await panel.getByRole('button', { name: 'Anton', exact: true }).click();
   await panel.getByRole('button', { name: 'Align left' }).click();
-  await panel.getByLabel('Letter spacing').fill('0.1');
-  await panel.getByLabel('Text width').fill('60');
+  await expect(panel.getByLabel('Letter spacing')).toHaveCount(0);
+  await panel.getByLabel('Word spacing', { exact: true }).fill('100');
+  await panel.getByLabel('Line spacing', { exact: true }).fill('1.8');
+  await panel.getByLabel('Text width', { exact: true }).fill('500');
   await panel.getByRole('slider', { name: /Font Size/ }).fill('96');
   await page.getByRole('button', { name: '2. Lyrics', exact: true }).click();
   await page.getByRole('button', { name: 'Save draft', exact: true }).click();
@@ -30,13 +32,18 @@ test('Studio text panel automatically saves color font and alignment', async ({ 
   await expect(panel.getByRole('button', { name: 'Align left' })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('.studio-autosave')).toHaveText('Saved');
   const saved = await (await request.get(`http://127.0.0.1:8011/api/studio/projects/${draft.id}`)).json();
-  expect(saved.text_style).toEqual({ position: 'middle', font_size: 96, bold: false, italic: false, underline: false, color: '#12abef', font: 'anton', align: 'left', letter_spacing: 0.1, text_width: 60 });
+  expect(saved.text_style).toEqual({ position: 'middle', font_size: 96, bold: false, italic: false, underline: false, color: '#12abef', font: 'anton', align: 'left', letter_spacing: 0, text_width: 82, word_spacing: 100, line_spacing: 1.8, text_width_px: 500 });
   await page.reload();
   await page.getByRole('button', { name: '4. Visuals', exact: true }).click();
   await expect(panel.getByRole('button', { name: 'Anton', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(sample).toHaveCSS('color', 'rgb(18, 171, 239)');
   await expect(sample).toHaveCSS('text-align', 'left');
-  for (const [label, font] of [['Abel', 'abel'], ['Mono', 'mono'], ['Bebas Neue', 'bebas'], ['Montserrat', 'montserrat'], ['Playfair Display', 'playfair'], ['Oswald', 'oswald'], ['Unbounded', 'unbounded'], ['Josefin Sans', 'josefin']]) {
+  await expect(panel.getByRole('button', { name: 'Mono', exact: true })).toHaveCount(0);
+  await expect(panel.getByRole('button', { name: 'Unbounded', exact: true })).toHaveCount(0);
+  await expect(panel.getByLabel('Word spacing', { exact: true })).toHaveValue('100');
+  await expect(panel.getByLabel('Line spacing', { exact: true })).toHaveValue('1.8');
+  await expect(panel.getByLabel('Text width', { exact: true })).toHaveValue('500');
+  for (const [label, font] of [['Abel', 'abel'], ['Roboto Mono', 'roboto_mono'], ['Space Grotesk', 'space_grotesk'], ['Atkinson Hyperlegible Next', 'atkinson_next'], ['Bebas Neue', 'bebas'], ['Montserrat', 'montserrat'], ['Playfair Display', 'playfair'], ['Oswald', 'oswald'], ['Josefin Sans', 'josefin']]) {
     await panel.getByRole('button', { name: label, exact: true }).click();
     await expect.poll(() => page.evaluate(async family => (await document.fonts.load(`20px "Vaulted ${family}"`)).length, label)).toBe(1);
     await expect(page.locator('.studio-autosave')).toHaveText('Saved');
@@ -45,6 +52,12 @@ test('Studio text panel automatically saves color font and alignment', async ({ 
     await expect(panel.getByRole('button', { name: label, exact: true })).toHaveAttribute('aria-pressed', 'true');
     expect((await (await request.get(`http://127.0.0.1:8011/api/studio/projects/${draft.id}`)).json()).text_style.font).toBe(font);
   }
+  await panel.getByRole('button', { name: 'Align justify', exact: true }).click();
+  await expect(page.locator('.studio-autosave')).toHaveText('Saved');
+  await page.reload();
+  await page.getByRole('button', { name: '4. Visuals', exact: true }).click();
+  await expect(panel.getByRole('button', { name: 'Align justify', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(sample).toHaveCSS('text-align', 'justify');
   await panel.getByRole('button', { name: 'Top', exact: true }).click();
   await expect(panel.getByRole('button', { name: 'Bold', exact: true })).toHaveCount(0);
   await expect(page.locator('.studio-autosave')).toHaveText('Saved');

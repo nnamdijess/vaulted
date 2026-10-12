@@ -26,7 +26,7 @@ def _cached_png(text, serialized, preset):
         from app.services.studio_fonts import FONT_FILES
         fonts = root / 'fonts'
         fonts.mkdir()
-        name = FONT_FILES.get(style.get('font'))
+        name = FONT_FILES.get(style.get('font'), 'Montserrat-Variable.ttf')
         if name:
             shutil.copy2(FONT_DIR / name, fonts / name)
         snapshot = {'lyric_style': preset, 'text_style': style,

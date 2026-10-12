@@ -38,10 +38,13 @@ class TextStyle(Input):
     italic: bool = False
     underline: bool = False
     letter_spacing: float = Field(default=0, ge=0, le=0.3)
+    word_spacing: float = Field(default=0, ge=0, le=160)
+    line_spacing: float = Field(default=1.2, ge=1, le=2.5)
+    text_width_px: int | None = Field(default=None, ge=240, le=972)
     text_width: int = Field(default=82, ge=40, le=90)
     color: str = Field(pattern=r'^#[0-9a-fA-F]{6}$')
-    font: Literal['default', 'abel', 'anton', 'lobster', 'blackletter', 'mono', 'bebas', 'dela', 'bowlby', 'montserrat', 'playfair', 'oswald', 'unbounded', 'josefin']
-    align: Literal['left', 'center', 'right']
+    font: Literal['default', 'abel', 'anton', 'lobster', 'blackletter', 'mono', 'bebas', 'dela', 'bowlby', 'montserrat', 'playfair', 'oswald', 'unbounded', 'josefin', 'roboto_mono', 'space_grotesk', 'atkinson_next']
+    align: Literal['left', 'center', 'right', 'justify']
 
 
 class Search(Input):

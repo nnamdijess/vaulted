@@ -188,3 +188,9 @@
 .studio-export-preview {display:block;max-width:100%;max-height:65dvh;margin:auto;}
 .studio-back {display:inline-flex;gap:8px;align-items:center;}
 @media(max-width:600px){.studio-render-grid{gap:10px;grid-template-columns:repeat(2,minmax(0,1fr));}.studio-workspace .studio-render-thumb{height:150px;}.studio-render-caption{padding:8px;}}
+
+@font-face { font-family: 'Vaulted Roboto Mono'; src: url('/api/studio/fonts/roboto_mono') format('truetype'); font-display: swap; }
+
+@font-face { font-family: 'Vaulted Space Grotesk'; src: url('/api/studio/fonts/space_grotesk') format('truetype'); font-display: swap; }
+
+@font-face { font-family: 'Vaulted Atkinson Hyperlegible Next'; src: url('/api/studio/fonts/atkinson_next') format('truetype'); font-display: swap; }

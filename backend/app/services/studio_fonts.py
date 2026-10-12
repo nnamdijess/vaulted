@@ -10,3 +10,6 @@ FONT_FILES.update({'bebas': 'BebasNeue-Regular.ttf', 'dela': 'DelaGothicOne-Regu
 
 FONTS.update({'montserrat': 'Montserrat', 'playfair': 'Playfair Display', 'oswald': 'Oswald', 'unbounded': 'Unbounded', 'josefin': 'Josefin Sans'})
 FONT_FILES.update({'montserrat': 'Montserrat-Variable.ttf', 'playfair': 'PlayfairDisplay-Variable.ttf', 'oswald': 'Oswald-Variable.ttf', 'unbounded': 'Unbounded-Variable.ttf', 'josefin': 'JosefinSans-Variable.ttf'})
+
+FONTS.update({"roboto_mono": "Roboto Mono", "space_grotesk": "Space Grotesk", "atkinson_next": "Atkinson Hyperlegible Next"})
+FONT_FILES.update({"roboto_mono": "RobotoMono-Variable.ttf", "space_grotesk": "SpaceGrotesk-Variable.ttf", "atkinson_next": "AtkinsonHyperlegibleNext-Variable.ttf"})

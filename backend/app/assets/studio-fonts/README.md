@@ -16,3 +16,12 @@ The authenticated Studio font endpoint serves these files to the browser.
 The render worker copies the same directory into each temporary render workspace
 and passes it to libass as `fontsdir`, without relying on a font installation or
 runtime downloads. Keep this directory when packaging the backend.
+
+Added 2026-10-12 (unmodified variable TrueType, with matching OFL licenses):
+
+- Roboto Mono: https://github.com/google/fonts/tree/main/ofl/robotomono
+- Space Grotesk: https://github.com/google/fonts/tree/main/ofl/spacegrotesk
+- Atkinson Hyperlegible Next: https://github.com/google/fonts/tree/main/ofl/atkinsonhyperlegiblenext
+
+Mono and Unbounded remain bundled for existing drafts but are hidden in the font picker.
+Default uses bundled Montserrat so wrapping does not depend on server-installed fonts.

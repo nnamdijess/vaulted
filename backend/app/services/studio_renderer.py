@@ -6,6 +6,7 @@ from app.services.studio_storage import content_path, ffmpeg
 from app.services.storage import audio_path
 from app.services.visual_provider import download_video
 from app.services.studio_fonts import FONT_DIR, FONTS
+from app.services.studio_text_layout import wrap_words, spaced_ass, justified_words
 
 
 def ffmpeg_time(seconds):
@@ -29,10 +30,11 @@ def subtitles(snapshot):
     alignment = {'top': 7, 'middle': 4, 'bottom': 1}[position] + {'left': 0, 'center': 1, 'right': 2}.get(custom.get('align'), 1)
     color = custom.get('color', '#FFFF80' if style == 'highlight' else '#FFFFFF').lstrip('#')
     primary = f'&H00{color[4:6]}{color[2:4]}{color[0:2]}'.upper()
-    font = FONTS.get(custom.get('font'), 'DejaVu Sans')
+    font = FONTS.get(custom.get('font'), 'Montserrat')
     bold, italic, underline = (-1 if custom.get(key, False) else 0 for key in ('bold', 'italic', 'underline'))
-    spacing = custom.get('letter_spacing', 0) * size
-    margin = round(1080 * (100 - custom.get('text_width', 82)) / 200)
+    spacing = 0
+    width = custom.get('text_width_px') or 1080 * custom.get('text_width', 82) / 100
+    margin = round((1080 - width) / 2)
     header = f'''[Script Info]
 ScriptType: v4.00+
 PlayResX: 1080
@@ -45,9 +47,21 @@ Style: Default,{font},{size},{primary},&H00FFFFFF,&H00101010,&H80000000,{bold},{
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 '''
     for line in snapshot['lines']:
-        # Prevent ASS override tags/escapes; lyrics are plain text, not markup.
-        text = line['text'].replace('\\', '＼').replace('{', '｛').replace('}', '｝').replace('\r', '').replace('\n', ' ')
-        header += f"Dialogue: 0,{ass_time(line['start_time'])},{ass_time(line['end_time'])},Default,,0,0,0,,{text}\n"
+        rows = wrap_words(line['text'], custom.get('font'), size, width, custom.get('word_spacing', 0))
+        advance = size * custom.get('line_spacing', 1.2)
+        height = size + (len(rows) - 1) * advance
+        top = 350 if position == 'top' else 1920 - 350 - height if position == 'bottom' else (1920 - height) / 2
+        align = custom.get('align', 'center')
+        anchor = {'left': 4, 'center': 5, 'right': 6, 'justify': 5}[align]
+        x = {'left': margin, 'center': 540, 'right': 1080 - margin, 'justify': 540}[align]
+        for index, row in enumerate(rows):
+            y = top + size / 2 + index * advance
+            parts = justified_words(row, custom.get('font'), size, width) if align == 'justify' else [(row, anchor, x)]
+            for words, part_anchor, part_x in parts:
+                tags = f"{{\\an{part_anchor}\\pos({part_x},{y:.3f})\\q2}}"
+                gap = 0 if align == 'justify' else custom.get('word_spacing', 0)
+                text = tags + spaced_ass(words, round(gap, 3))
+                header += f"Dialogue: 0,{ass_time(line['start_time'])},{ass_time(line['end_time'])},Default,,0,0,0,,{text}\n"
     return header
 
 
