@@ -8,6 +8,7 @@ import { WorkspaceNav } from '../workspace-nav';
 import { api, postJson } from '@/lib/api';
 import { ContentProject, StudioSong } from '@/lib/studio';
 import { RenderGallery } from './render-gallery';
+import { RecentProjects } from './recent-projects';
 import { StudioEditor } from './editor';
 import './studio.css';
 
@@ -24,7 +25,7 @@ function Dashboard() {
   useEffect(() => { let active = true; api<ContentProject[]>('/studio/projects').then(value => { if (active) setProjects(value); }).catch(err => { if (active) setError(err.message); }).finally(() => { if (active) setLoading(false); }); return () => { active = false; }; }, []);
   return <><div className="studio-heading"><div><p className="eyebrow">A space to create</p><h1>Studio</h1><p>Turn a moment from your music into a lyric video.</p></div><Link className="button" href="/studio/new">Create New</Link></div>
     {error && <p role="alert">{error}</p>}{loading && <p role="status">Loading Studio…</p>}
-    <h2>Recent Content Projects</h2><div className="studio-cards">{projects.slice(0, 6).map(project => <Link className="studio-card" key={project.id} href={`/studio/${project.id}`}><Cover project={project} /><strong>{project.title}</strong><span>{project.song_title} · {project.status}</span></Link>)}</div>
+    <RecentProjects projects={projects} />
     {!loading && !projects.length && <p>Your first video starts with a song already in your Library.</p>}
     <h2>Drafts</h2>{projects.filter(project => project.status !== 'completed').map(project => <p key={project.id}><Link href={`/studio/${project.id}`}>{project.title}</Link></p>)}
     <RenderGallery projects={projects} onDeleted={(projectId,jobId)=>setProjects(items=>items.map(item=>item.id===projectId?{...item,jobs:item.jobs.filter(job=>job.id!==jobId)}:item))} />
