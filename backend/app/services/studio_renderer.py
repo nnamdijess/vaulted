@@ -1,10 +1,19 @@
 """Bounded FFmpeg pipeline. All paths and arguments originate on the server."""
+import math
 import shutil
 import subprocess
 from app.services.studio_storage import content_path, ffmpeg
 from app.services.storage import audio_path
 from app.services.visual_provider import download_video
 from app.services.studio_fonts import FONT_DIR, FONTS
+
+
+def ffmpeg_time(seconds):
+    """FFmpeg duration arguments require decimal notation, not float exponents."""
+    value = float(seconds)
+    if not math.isfinite(value) or value < -0.000001:
+        raise ValueError('Invalid render timestamp')
+    return f'{max(0.0, value):.6f}'
 
 
 def ass_time(seconds):
@@ -68,8 +77,8 @@ def render(job_id, snapshot, update_progress):
                 download_video(media['video_url'], stock)
             filename = f'clip-{index}.mp4'
             treatment = ',hue=s=0' if snapshot.get('render_aesthetic', snapshot['aesthetic']) == 'black-white' else ''
-            command(['-protocol_whitelist', 'file,pipe', *(['-stream_loop', '-1'] if clip.get('loop_source', True) else []), '-ss', str(clip['source_start']), '-f', 'mov', '-i', str(stock),
-                     '-t', str(clip['end_time'] - clip['start_time']), '-an',
+            command(['-protocol_whitelist', 'file,pipe', *(['-stream_loop', '-1'] if clip.get('loop_source', True) else []), '-ss', ffmpeg_time(clip['source_start']), '-f', 'mov', '-i', str(stock),
+                     '-t', ffmpeg_time(clip['end_time'] - clip['start_time']), '-an',
                      '-vf', framing_filter(clip.get('framing') or {}) + f',setsar=1,fps=30{treatment}',
                      '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-pix_fmt', 'yuv420p', '-threads', '2', filename], work)
             files.append(f"file '{filename}'")
@@ -77,8 +86,8 @@ def render(job_id, snapshot, update_progress):
         (work / 'clips.txt').write_text('\n'.join(files), encoding='utf-8')
         (work / 'lyrics.ass').write_text(subtitles(snapshot), encoding='utf-8')
         args = ['-protocol_whitelist', 'file,pipe', '-f', 'concat', '-safe', '1', '-i', 'clips.txt',
-                '-ss', str(snapshot['start_time']), '-protocol_whitelist', 'file,pipe', '-i', str(audio_path(snapshot['audio_path'])),
-                '-map', '0:v:0', '-map', '1:a:0', '-t', str(snapshot['end_time'] - snapshot['start_time'])]
+                '-ss', ffmpeg_time(snapshot['start_time']), '-protocol_whitelist', 'file,pipe', '-i', str(audio_path(snapshot['audio_path'])),
+                '-map', '0:v:0', '-map', '1:a:0', '-t', ffmpeg_time(snapshot['end_time'] - snapshot['start_time'])]
         if snapshot['lines']:
             shutil.copytree(FONT_DIR, work / 'fonts', dirs_exist_ok=True)
             args += ['-vf', 'subtitles=lyrics.ass:fontsdir=fonts']
