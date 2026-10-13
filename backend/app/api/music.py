@@ -4,12 +4,12 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import ValidationError
-from sqlalchemy import delete, func, select, text
+from sqlalchemy import delete, func, select, text, update
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.auth import owned_session
 from app.models.music import ListenEvent, Project, Song, SongVersion
-from app.schemas.music import ProjectCreate, ProjectRead, SongCreate, SongRead, SongUpdate, VersionCreate, VersionRead
+from app.schemas.music import ProjectCreate, ProjectRead, SongCreate, SongRead, SongUpdate, SongMove, VersionCreate, VersionRead
 from app.services.storage import AUDIO_TYPES, audio_path, save_audio
 
 router = APIRouter()
@@ -118,6 +118,35 @@ def update_song(song_id: int, data: SongUpdate, db: Database):
     return song
 
 
+@router.post("/songs/{song_id}/move", response_model=SongRead, tags=["songs"])
+def move_song(song_id: int, data: SongMove, db: Database):
+    # Serialize with uploads and reorder operations before reading either list.
+    lock_track_order(db)
+    try:
+        song = require_record(db, Song, song_id)
+        destination = require_record(db, Project, data.project_id)
+        source_id = song.project_id
+        if source_id == destination.id:
+            raise HTTPException(409, "This song is already in that project")
+        source = db.scalars(select(Song).where(Song.project_id == source_id).order_by(Song.position, Song.id)).all()
+        target = db.scalars(select(Song).where(Song.project_id == destination.id).order_by(Song.position, Song.id)).all()
+        if song.cover_path is None:
+            # Empty string records an intentionally artwork-free original project.
+            song.cover_path = song.project.cover_path or ''
+        song.project = destination
+        db.execute(update(ListenEvent).where(ListenEvent.song_id == song.id).values(project_id=destination.id))
+        for position, item in enumerate([item for item in source if item.id != song.id], 1):
+            item.position = position
+        for position, item in enumerate([*target, song], 1):
+            item.position = position
+        db.commit()
+        db.refresh(song)
+        return song
+    except Exception:
+        db.rollback()
+        raise
+
+
 @router.delete("/songs/{song_id}", status_code=204, tags=["songs"])
 def delete_song(song_id: int, db: Database):
     song = require_record(db, Song, song_id)
@@ -136,6 +165,13 @@ def delete_song(song_id: int, db: Database):
             import logging
             logging.getLogger(__name__).exception("Could not remove orphaned audio file %s", path)
     return Response(status_code=204)
+
+
+@router.get("/songs/{song_id}/cover", tags=["songs"])
+def song_cover(song_id: int, db: Database):
+    from app.services.artwork import image_response
+    song = require_record(db, Song, song_id)
+    return image_response(song.cover_path if song.cover_path is not None else song.project.cover_path)
 
 
 @router.get("/songs/{song_id}/versions", response_model=list[VersionRead], tags=["versions"])

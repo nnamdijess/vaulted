@@ -9,6 +9,7 @@ import { CropControls } from './crop-controls';
 import { TimelinePreview } from './timeline-preview';
 import { ClipPreview } from './clip-preview';
 import { api } from '@/lib/api';
+import { PlayerIcon } from '../player-icon';
 
 type Gesture = { kind: 'order' | 'left' | 'right'; index: number; x: number; original: TimelineClip[]; moved: boolean };
 export function DraftTimeline({ project, clips, disabled, saving, onReplace, textStyle, onEdit }: {
@@ -51,11 +52,11 @@ export function DraftTimeline({ project, clips, disabled, saving, onReplace, tex
     if (match >= 0) setSelected(match);
   }
   function edit(next: TimelineClip[], selection = index) {
-    player.pause(); setFollowing(false); setHistory(items => [...items.slice(-19), clips]);
+    player.pause(); setCursor(time); setFollowing(false); setHistory(items => [...items.slice(-19), clips]);
     onEdit(packClips(next)); setSelected(Math.max(0, Math.min(selection, next.length - 1))); setError('');
   }
   function updateClip(values: Partial<TimelineClip>) { if (clip) edit(clips.map((c, i) => i === index ? { ...c, ...values } : c)); }
-  function undo() { const previous = history.at(-1); if (!previous) return; player.pause(); setFollowing(false); onEdit(previous); setHistory(items => items.slice(0, -1)); }
+  function undo() { const previous = history.at(-1); if (!previous) return; player.pause(); setCursor(time); setFollowing(false); onEdit(previous); setHistory(items => items.slice(0, -1)); }
   function play() {
     if (!clips.length) return;
     if (playing) { player.pause(); return; }
@@ -141,9 +142,11 @@ export function DraftTimeline({ project, clips, disabled, saving, onReplace, tex
     <h3>Your draft</h3>
     {shown.length > 0 && <TimelinePreview project={project} clips={shown} index={previewIndex} time={time} playing={playing} pause={player.pause}
       style={textStyle} cropEnabled={crop && !disabled} framing={framing => updateClip({ framing })} />}
-    <div className="studio-timeline-toolbar">
-      <button disabled={disabled || !clips.length} onClick={play}>{playing ? 'Pause draft' : 'Play draft'}</button>
-      <span>{timestamp(time)} / {timestamp(limit)}</span>
+    <div className="studio-playback-bar" role="group" aria-label="Draft playback">
+      <button className="studio-play-button" disabled={disabled || !clips.length} onClick={play}><PlayerIcon name={playing ? 'pause' : 'play'} />{playing ? 'Pause' : 'Play'}</button>
+      <span className="studio-playback-time">{timestamp(time)} <span>/ {timestamp(limit)}</span></span>
+    </div>
+    <div className="studio-timeline-toolbar" role="group" aria-label="Timeline tools">
       <button disabled={disabled || !clip || time <= clip.start_time + 1 / 30 || time >= clip.end_time - 1 / 30} onClick={split}>Split</button>
       <button disabled={disabled || loading} onClick={() => void openLibrary()}>{loading ? 'Loading clips…' : 'Add clips'}</button>
       <button disabled={disabled || !history.length} onClick={undo}>Undo</button>

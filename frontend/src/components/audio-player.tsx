@@ -12,6 +12,7 @@ import { PlaybackOrder, RepeatMode } from "@/lib/playback-order";
 import {
   createContext,
   useContext,
+  useEffect,
   useSyncExternalStore,
   useRef,
   useState,
@@ -30,6 +31,7 @@ export type QueueTrack = {
   publicToken?: string;
   projectId?: number;
   coverUrl?: string;
+  preservedCover?: boolean;
   album?: string;
 };
 
@@ -47,7 +49,8 @@ export function trackFor(
         versionName: song.latest_version_name,
         versionId: song.latest_version_id,
         projectId: song.project_id,
-        coverUrl: projectCoverUrl(project),
+        preservedCover: song.cover_path != null,
+        coverUrl: song.cover_path != null ? (song.cover_path ? apiUrl(`/songs/${song.id}/cover`) : undefined) : projectCoverUrl(project),
         album: project?.name,
       }
     : null;
@@ -186,6 +189,23 @@ export function AudioPlayerProvider({
     });
   }
 
+  useEffect(() => {
+    if (!studioActive || !playing) return;
+    let frame = 0;
+    function tick() {
+      const el = audio.current, bounds = studio.current;
+      if (!el || !bounds || el.paused) return;
+      if (el.currentTime >= bounds.end) {
+        el.pause(); el.currentTime = bounds.end; setElapsed(bounds.end);
+        return;
+      }
+      setElapsed(el.currentTime);
+      frame = requestAnimationFrame(tick);
+    }
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [studioActive, playing]);
+
   function beginStudio(versionId: number, start: number, end: number) {
     const element = audio.current;
     if (!element) return;
@@ -316,6 +336,9 @@ export function AudioPlayerProvider({
       track.songId === song.id
         ? {
             ...track,
+            projectId: song.project_id,
+            preservedCover: song.cover_path != null,
+            coverUrl: song.cover_path != null ? (song.cover_path ? apiUrl(`/songs/${song.id}/cover`) : undefined) : track.coverUrl,
             title: song.title,
             artist: song.artist,
           }
@@ -330,7 +353,7 @@ export function AudioPlayerProvider({
       track.projectId === project.id && !track.publicToken
         ? {
             ...track,
-            coverUrl: projectCoverUrl(project),
+            coverUrl: track.preservedCover ? track.coverUrl : projectCoverUrl(project),
             album: project.name,
             fallbackArtist:
               project.artist || project.owner_name,
@@ -503,7 +526,7 @@ export function AudioPlayerProvider({
               insights.resetSample(audio.current);
             }
           }}
-          onPause={() => setPlaying(false)}
+          onPause={() => { setPlaying(false); if (audio.current) setElapsed(audio.current.currentTime); }}
           onSeeking={() => {
             if (audio.current) {
               insights.resetSample(audio.current);
@@ -526,6 +549,7 @@ export function AudioPlayerProvider({
             if (audio.current && studio.current && audio.current.currentTime >= studio.current.end) {
               audio.current.pause();
               audio.current.currentTime = studio.current.end;
+              setElapsed(studio.current.end);
             }
           }}
           onDurationChange={() =>

@@ -79,6 +79,8 @@ def layout(text, style, preset='minimal'):
         size = max(8, size * min(.9, 1600 / height))
     position = style.get('position') or ('bottom' if preset == 'lower' else 'middle')
     top = {'top': 160, 'middle': (1920-height)/2, 'bottom': 1760-height}[position]
+    if style.get('text_y') is not None:
+        top = 160 + (1600-height) * style['text_y']
     result = []
     last_text_row = max((index for index, row in enumerate(rows) if row), default=0)
     for index, row in enumerate(rows):

@@ -78,10 +78,12 @@ export function Visuals({ project, setProject, disabled: baseDisabled, pause, ru
         onChange={value => { setPendingStyle(value); autosave.queue({ text_style: value }); }} />
     </div>
     <div className="studio-actions"><button disabled={disabled} onClick={() => { openBrowser(); void run(review); }}>Review Media</button>
+      <button type="button" disabled={!project.clips.length} onClick={() => draft.current?.querySelector('.studio-draft-preview')?.scrollIntoView({block:'start', behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'})}><ExportIcon name="up" /> Back to Video</button>
+    <details className="studio-more-tools"><summary>More visual options</summary><div className="studio-actions">
     {(!!project.clips.length || !!project.media_pool?.length) && <button disabled={disabled} onClick={() => void run(() => generate('reroll'))}>Reroll Visuals</button>}
     {!!project.clips.length && <><button disabled={disabled} onClick={() => void run(() => generate('order'))}>Reroll clip order</button>
       <button disabled={disabled} onClick={() => void run(async () => { pause(); setProject(await api<ContentProject>(`/studio/projects/${project.id}/clips`, { method: 'DELETE' })); })}>Clear draft visuals</button></>}
-    </div>
+    </div></details></div>
     {!!project.media_pool?.length && <p>Rerolls use your {project.media_pool.length} chosen clips, preferring footage not in the current draft. Your library stays unchanged.</p>}
     <div ref={browser} hidden={!!project.clips.length && !browsing}>
     <div className="studio-media-tabs" role="tablist" aria-label="Media source">

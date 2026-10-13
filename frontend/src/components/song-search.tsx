@@ -30,9 +30,9 @@ export function SongSearch({ onNavigate }: { onNavigate?: () => void }) {
     {query.trim() && !loading && !error && result && <><ul className="search-results">{result.items.map(song => <li key={song.id}>
       <span className="search-cover">{song.cover_path ?
         // eslint-disable-next-line @next/next/no-img-element -- private local cover
-        <img src={apiUrl(`/projects/${song.project_id}/cover?v=${encodeURIComponent(song.cover_path)}`)} alt={`${song.project_name} cover`} /> : <span aria-hidden="true">♫</span>}</span>
+        <img src={apiUrl(`/songs/${song.id}/cover?v=${encodeURIComponent(song.cover_path)}`)} alt={`${song.project_name} cover`} /> : <span aria-hidden="true">♫</span>}</span>
       <div><Link onClick={onNavigate} href={`/songs/${song.id}`}>{song.title}</Link><small>{song.artist}</small><Link className="muted" href={`/projects/${song.project_id}`}>{song.project_name}</Link></div>
-      <button disabled={!song.latest_version_id} aria-label={`Play ${song.title}`} onClick={() => player.playQueue([{ songId: song.id, projectId: song.project_id, title: song.title, artist: song.song_artist, fallbackArtist: song.fallback_artist, usesOwnerName: song.uses_owner_name, versionName: song.version_name, versionId: song.latest_version_id!, coverUrl: song.cover_path ? apiUrl(`/projects/${song.project_id}/cover?v=${encodeURIComponent(song.cover_path)}`) : undefined }])}><PlayerIcon name="play" /></button>
+      <button disabled={!song.latest_version_id} aria-label={`Play ${song.title}`} onClick={() => player.playQueue([{ songId: song.id, projectId: song.project_id, title: song.title, artist: song.song_artist, fallbackArtist: song.fallback_artist, usesOwnerName: song.uses_owner_name, versionName: song.version_name, versionId: song.latest_version_id!, preservedCover:true, coverUrl: song.cover_path ? apiUrl(`/songs/${song.id}/cover?v=${encodeURIComponent(song.cover_path)}`) : undefined }])}><PlayerIcon name="play" /></button>
     </li>)}</ul>{!result.items.length && <p role="status">No songs found.</p>}<div className="dialog-buttons">{offset > 0 && <button onClick={() => { setError(''); setOffset(Math.max(0,offset-50)); }}>Previous results</button>}{result.has_more && <button onClick={() => { setError(''); setOffset(offset+50); }}>More results</button>}</div></>}
   </section>;
 }

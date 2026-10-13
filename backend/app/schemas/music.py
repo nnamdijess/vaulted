@@ -65,6 +65,7 @@ class ProjectRead(Record):
 
 
 class SongRead(Record):
+    cover_path: str | None = None
     project_id: int
     title: str
     artist: str
@@ -83,3 +84,7 @@ class VersionRead(Record):
     file_path: str
     original_filename: str
     notes: str
+
+
+class SongMove(InputModel):
+    project_id: int = Field(gt=0)

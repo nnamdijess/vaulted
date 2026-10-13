@@ -1,29 +1,38 @@
 "use client";
+import { useState } from 'react';
 import { TextStyle, studioFonts, lyricCss, fontWeights } from '@/lib/studio-text-style';
 
 export function TextStylePanel({ value, onChange, disabled, lyrics = [] }: {
   lyrics?: string[]; value: TextStyle; onChange: (value: TextStyle) => void; disabled: boolean;
 }) {
+  const [fontQuery, setFontQuery] = useState('');
+  const fontName = value.font === 'default' ? 'Default' : studioFonts[value.font].replace('Vaulted ', '');
   const weights = fontWeights(value.font);
   const selectedWeight = weights.reduce((best, weight) => Math.abs(weight-(value.font_weight ?? 400)) < Math.abs(best-(value.font_weight ?? 400)) ? weight : best);
   const condensed = ['oswald','barlow_condensed','bebas','anton','archivo_narrow','teko','fjalla_one','saira_condensed','league_gothic','roboto_condensed'];
+  const visibleFonts = Object.entries(studioFonts).filter(([font]) => !['lobster', 'blackletter', 'dela', 'bowlby', 'mono', 'unbounded'].includes(font)).filter(([font, family]) => (font === 'default' ? 'Default' : family).toLowerCase().includes(fontQuery.toLowerCase().trim()));
   return <aside className="studio-text-panel" aria-label="Text styling">
     <h3>Text style</h3><p>Applies to all lyrics in this draft.</p>
     <fieldset disabled={disabled}><legend>Text color</legend>
       <label className="studio-custom-color">Custom text color<input type="color" value={value.color} onChange={event => onChange({ ...value, color: event.target.value })} /></label>
     </fieldset>
-    <fieldset disabled={disabled}><legend>Font</legend>{[true, false].map(narrow => <div key={String(narrow)}><h4>{narrow ? 'Condensed & display' : 'More fonts'}</h4><div className="studio-font-options">
-      {Object.entries(studioFonts).filter(([font]) => condensed.includes(font) === narrow).filter(([font]) => !['lobster', 'blackletter', 'dela', 'bowlby', 'mono', 'unbounded'].includes(font)).map(([font, family]) => <button type="button" className="secondary" key={font} style={{ fontFamily: family }}
+    <details className="studio-inspector-group" data-testid="studio-font-group"><summary><span>Font</span><small>{fontName}</small></summary>
+    <fieldset disabled={disabled}><legend className="sr-only">Font</legend><label>Find a font<input type="search" value={fontQuery} onChange={event => setFontQuery(event.target.value)} placeholder="Search fonts…" /></label>{!visibleFonts.length && <p role="status">No fonts match your search.</p>}{[true, false].filter(narrow => visibleFonts.some(([font]) => condensed.includes(font) === narrow)).map(narrow => <div key={String(narrow)}><h4>{narrow ? 'Condensed & display' : 'More fonts'}</h4><div className="studio-font-options">
+      {visibleFonts.filter(([font]) => condensed.includes(font) === narrow).map(([font, family]) => <button type="button" className="secondary" key={font} style={{ fontFamily: family }}
         aria-pressed={value.font === font} onClick={() => onChange({ ...value, font: font as TextStyle['font'], font_weight: fontWeights(font as TextStyle['font']).reduce((best, weight) => Math.abs(weight-(value.font_weight ?? 400)) < Math.abs(best-(value.font_weight ?? 400)) ? weight : best) })}>{font === 'default' ? 'Default' : family.replace('Vaulted ', '')}</button>)}
-    </div></div>)}</fieldset>
-    <fieldset disabled={disabled}><legend>Lyric position</legend><div className="studio-alignment-options">
-      {(['top', 'middle', 'bottom'] as const).map(position => <button type="button" key={position} aria-pressed={value.position === position}
-        onClick={() => onChange({ ...value, position })}>{position[0].toUpperCase() + position.slice(1)}</button>)}
+    </div></div>)}</fieldset></details>
+    <details className="studio-inspector-group" open><summary><span>Position & alignment</span><small>{value.align}</small></summary>
+    <fieldset disabled={disabled}><legend>Lyric position</legend>
+      <label>Vertical position<input aria-label="Lyric vertical position" type="range" min="0" max="1" step="0.005" value={value.text_y ?? (value.position === 'top' ? 0 : value.position === 'bottom' ? 1 : .5)} onChange={e => onChange({...value, text_y:Number(e.target.value)})} /></label>
+      <small>Move the full text block from top to bottom, inside the video margins.</small><div className="studio-alignment-options">
+      {(['top', 'middle', 'bottom'] as const).map(position => <button type="button" key={position} aria-pressed={(value.text_y ?? (value.position === 'top' ? 0 : value.position === 'bottom' ? 1 : .5)) === (position === 'top' ? 0 : position === 'bottom' ? 1 : .5)}
+        onClick={() => onChange({ ...value, position, text_y: position === 'top' ? 0 : position === 'bottom' ? 1 : .5 })}>{position[0].toUpperCase() + position.slice(1)}</button>)}
     </div></fieldset>
     <fieldset disabled={disabled}><legend>Alignment</legend><div className="studio-alignment-options">
       {(['left', 'center', 'right', 'justify'] as const).map(align => <button type="button" key={align} className="secondary" aria-label={`Align ${align}`}
         aria-pressed={value.align === align} onClick={() => onChange({ ...value, align })}>{align[0].toUpperCase() + align.slice(1)}</button>)}
     </div>{value.align === 'justify' && <small>Spreads words across the region. Single words keep their shape. Choose how the final line aligns below.</small>}</fieldset>
+    </details><details className="studio-inspector-group"><summary><span>Size & spacing</span><small>{value.font_size ?? 48}px</small></summary>
     <fieldset disabled={disabled}><legend>Layout</legend>
       <label>Font weight<select aria-label="Font weight" value={selectedWeight} onChange={e => onChange({...value, font_weight:Number(e.target.value)})}>{weights.map(weight => <option key={weight} value={weight}>{weight}</option>)}</select></label>
       <small>Uses the nearest available weight for this font.</small>
@@ -41,7 +50,8 @@ export function TextStylePanel({ value, onChange, disabled, lyrics = [] }: {
       <label>Text width: {value.text_width_px ?? Math.round((value.text_width ?? 82) * 10.8)}px<input aria-label="Text width" type="range" min="240" max="972" step="1" value={value.text_width_px ?? Math.round((value.text_width ?? 82) * 10.8)} onChange={event => onChange({ ...value, text_width_px: Number(event.target.value) })} /></label>
       <small>Pixels in the 1080 × 1920 export. Narrow the box to wrap words onto shorter lines.</small>
     </fieldset>
-    {!!lyrics.length && <details><summary>Edit lyric line breaks</summary><p>Keep the words unchanged. Enter adds a row inside the same timed lyric; blank rows add space.</p>{lyrics.map((text,index) => <label key={index}>Lyric {index+1}<textarea aria-label={`Layout for lyric ${index+1}`} value={value.line_breaks?.[text] ?? text} disabled={disabled} maxLength={1000} onChange={e => onChange({...value, line_breaks:{...value.line_breaks,[text]:e.target.value}})} /></label>)}</details>}
+    </details>
+    {!!lyrics.length && <details className="studio-inspector-group"><summary>Edit lyric line breaks</summary><p>Keep the words unchanged. Enter adds a row inside the same timed lyric; blank rows add space.</p>{lyrics.map((text,index) => <label key={index}>Lyric {index+1}<textarea aria-label={`Layout for lyric ${index+1}`} value={value.line_breaks?.[text] ?? text} disabled={disabled} maxLength={1000} onChange={e => onChange({...value, line_breaks:{...value.line_breaks,[text]:e.target.value}})} /></label>)}</details>}
     <div className="studio-text-sample" style={lyricCss(value)} aria-label="Text style sample">Your lyrics, your style</div>
     <p>Changes save automatically.</p>
   </aside>;

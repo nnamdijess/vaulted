@@ -89,7 +89,7 @@ class ImprovementsTest(unittest.TestCase):
         self.client.put(self.url+'/timings',json={'starts':[.5,1.5]})
         self.client.post(self.url+'/draft',json={'media_ids':[identifier]})
         text='she sucking out my soul like a demon'
-        style={'font':'oswald','font_size':64,'font_weight':500,'color':'#FFFFFF','align':'justify','text_width_px':500,
+        style={'text_y':.735,'font':'oswald','font_size':64,'font_weight':500,'color':'#FFFFFF','align':'justify','text_width_px':500,
                'line_breaks':{text:'she sucking\nout my\nsoul like a\ndemon'}}
         saved=self.client.put(self.url+'/text-style',json=style).json()
         job=self.client.post(self.url+'/renders').json()

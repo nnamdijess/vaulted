@@ -35,7 +35,7 @@ def view(project, db):
     return {key: getattr(project, key) for key in ('id', 'title', 'song_id', 'song_version_id', 'status', 'start_time', 'end_time',
              'lyrics_text', 'aesthetic', 'lyric_style', 'media_pool', 'text_style', 'revision', 'created_at', 'updated_at')} | {
         'song_title': song.title, 'artist': song.artist or song.project.artist or song.project.owner_name,
-        'project_id': song.project_id, 'cover_path': song.project.cover_path, 'version_name': version.version_name,
+        'project_id': song.project_id, 'cover_path': song.cover_path if song.cover_path is not None else song.project.cover_path, 'version_name': version.version_name,
         'lines': [{'text': line.text, 'start_time': line.start_time, 'end_time': line.end_time} for line in project.lines],
         'clips': [{'id': clip.id, 'media_id': clip.media_id, 'start_time': clip.start_time, 'end_time': clip.end_time,
                    'source_start': clip.source_start, 'loop_source': clip.loop_source, 'framing': clip.framing, 'media': clip.media.metadata_json} for clip in project.clips],
@@ -133,8 +133,8 @@ def songs(db: Database, q: str = ''):
     if len(q) > 100:
         raise HTTPException(422, 'Search is too long')
     rows = db.scalars(select(Song).join(Project).where(Project.owner_id == db.info['owner_id']).order_by(Song.id.desc())).all()
-    return [{'id': song.id, 'title': song.title, 'artist': song.artist or song.project.artist or song.project.owner_name,
-             'project_id': song.project_id, 'project_name': song.project.name, 'cover_path': song.project.cover_path,
+    return [{'id': song.id, 'song_id': song.id, 'title': song.title, 'artist': song.artist or song.project.artist or song.project.owner_name,
+             'project_id': song.project_id, 'project_name': song.project.name, 'cover_path': song.cover_path if song.cover_path is not None else song.project.cover_path,
              'versions': [{'id': v.id, 'name': v.version_name} for v in sorted(song.versions, key=lambda v: -v.id)]}
             for song in rows if song.versions and q.casefold() in f'{song.title} {song.artist} {song.project.name}'.casefold()][:100]
 

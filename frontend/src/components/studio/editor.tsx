@@ -10,6 +10,7 @@ import { Cover } from './workspace';
 import { Visuals } from './visuals';
 import { TextStyle, lyricCss, resolveTextStyle } from '@/lib/studio-text-style';
 import { SongNotes } from './song-notes';
+import { TimelinePreview } from './timeline-preview';
 import { RenderGallery } from './render-gallery';
 
 export function StudioEditor({ identifier }: { identifier: string }) {
@@ -26,6 +27,7 @@ export function StudioEditor({ identifier }: { identifier: string }) {
   const [selectedMedia, setSelectedMedia] = useState<number[] | null>(null);
   const [syncMode, setSyncMode] = useState<'idle' | 'record' | 'preview'>('idle');
   const player = usePlayer();
+  const sectionStarted = useRef(false);
   const stop = useRef(player.stopStudio);
   const pauseOnEntry = useRef(player.pause);
   const router = useRouter();
@@ -56,19 +58,20 @@ export function StudioEditor({ identifier }: { identifier: string }) {
   const relative = Math.max(0, player.elapsed - current.start_time);
   const timingValid = starts.length === current.lines.length && starts.every((time, index) => Number.isFinite(time) && time >= 0 && time < length && (index === 0 || time > starts[index - 1]));
   const previewLine = timingValid ? current.lines.find((_, index) => relative >= starts[index] && relative < (starts[index + 1] ?? length)) : undefined;
-  function update(values: Partial<ContentProject>) { player.pause(); setProject({ ...current, ...values }); setDirty(true); }
+  function update(values: Partial<ContentProject>) { player.pause(); sectionStarted.current = false; setProject({ ...current, ...values }); setDirty(true); }
   async function save() {
     const result = await api<ContentProject>(`/studio/projects/${identifier}`, { ...postJson({ title: current.title, start_time: current.start_time, end_time: current.end_time, lyrics_text: current.lyrics_text, aesthetic: current.aesthetic, lyric_style: current.lyric_style }), method: 'PATCH' });
     setProject(result); setStarts(result.lines.flatMap(line => line.start_time === null ? [] : [line.start_time])); setDirty(false); setNotice('Draft saved');
   }
-  return <><Link href="/studio" className="studio-back"><span aria-hidden="true">← </span>Back to Studio</Link><div className="studio-heading"><Cover project={current} /><div><h1>{current.song_title}</h1><p>{current.artist} · {current.version_name}</p></div></div>
+  return <><Link href="/studio" className="studio-back"><span aria-hidden="true">← </span>Back to Studio</Link><div className="studio-heading studio-editor-heading"><Cover project={current} /><div><p className="eyebrow">Video studio</p><h1>{current.song_title}</h1><p>{current.artist} · {current.version_name}</p></div><span className="studio-project-status">{dirty ? "Unsaved changes" : "Draft"}</span></div>
     {error && <p role="alert" className="error">{error}</p>}{notice && <p role="status">{notice}</p>}
-    <nav className="studio-steps" aria-label="Studio steps">{['Section', 'Lyrics', 'Sync', 'Visuals', 'Export'].map((label, index) => <button key={label} disabled={timelineDirty} style={{ color: step === index + 1 ? 'var(--background)' : 'var(--text)' }} aria-current={step === index + 1 ? 'step' : undefined} onClick={() => { player.pause(); setError(''); setStep(index + 1); }}>{index + 1}. {label}</button>)}</nav>
+    <nav className="studio-steps" aria-label="Studio steps">{['Section', 'Lyrics', 'Sync', 'Visuals', 'Export'].map((label, index) => <button key={label} disabled={timelineDirty} aria-current={step === index + 1 ? 'step' : undefined} onClick={() => { player.pause(); setError(''); setStep(index + 1); }}><span className="studio-step-number">{index + 1}.</span> {label}</button>)}</nav>
     <section hidden={step !== 1} className="studio-panel"><h2>Choose a moment</h2><label>Video title<input value={current.title} maxLength={200} onChange={event => update({ title: event.target.value })} /></label>
+      {step === 1 && !!current.clips.length && <TimelinePreview project={current} clips={current.clips} index={relative >= length ? current.clips.length - 1 : Math.max(0,current.clips.findIndex(clip => relative >= clip.start_time && relative < clip.end_time))} time={Math.min(relative,length)} playing={player.playing} pause={player.pause} cropEnabled={false} framing={() => {}} />}
       <SectionSelector key={current.song_version_id} endpoint={`/api/versions/${current.song_version_id}/waveform`} elapsed={player.elapsed} duration={duration} start={current.start_time} end={current.end_time} onChange={(start_time, end_time) => update({ start_time, end_time })} />
       <div className="studio-fields"><label>Start (seconds)<input type="number" min={0} max={duration} step="0.01" value={current.start_time} onChange={event => update({ start_time: Number(event.target.value) })} /></label><label>End (seconds)<input type="number" min={0} max={duration} step="0.01" value={current.end_time} onChange={event => update({ end_time: Number(event.target.value) })} /></label></div>
       <p>{length.toFixed(2)} seconds selected · {duration.toFixed(2)} seconds available</p><div className="studio-actions">{[10, 15, 20, 30].map(seconds => <button type="button" key={seconds} onClick={() => update({ start_time: Math.min(current.start_time, Math.max(0, duration - seconds)), end_time: Math.min(duration, Math.min(current.start_time, Math.max(0, duration - seconds)) + seconds) })}>{seconds}s</button>)}</div>
-      <div className="studio-actions"><button disabled={length <= 0 || current.end_time > duration} onClick={() => player.beginStudio(current.song_version_id, current.start_time, current.end_time)}>Preview section</button><button disabled={length <= 0 || current.start_time < 0 || current.end_time > duration} onClick={() => player.beginStudio(current.song_version_id, Math.max(current.start_time, current.end_time - 3), current.end_time)}>Last 3s</button><button onClick={player.pause} disabled={!player.playing}>Pause</button></div>{player.previewError && <p role="alert">{player.previewError}</p>}
+      <div className="studio-actions studio-section-playback"><button disabled={length <= 0 || current.end_time > duration} onClick={() => { if (player.playing) player.pause(); else { player.beginStudio(current.song_version_id, sectionStarted.current && player.elapsed >= current.start_time && player.elapsed < current.end_time ? player.elapsed : current.start_time, current.end_time); sectionStarted.current = true; } }}>{player.playing ? 'Pause' : 'Play'}</button><button disabled={length <= 0 || current.start_time < 0 || current.end_time > duration} onClick={() => { sectionStarted.current = true; player.beginStudio(current.song_version_id, current.start_time, current.end_time); }}>Restart</button><button disabled={length <= 0 || current.start_time < 0 || current.end_time > duration} onClick={() => { sectionStarted.current = true; player.beginStudio(current.song_version_id, Math.max(current.start_time, current.end_time - 3), current.end_time); }}>Last 3s</button></div>{player.previewError && <p role="alert">{player.previewError}</p>}
       <button disabled={busy || !dirty} onClick={() => void action(save)}>Save section</button>
     </section>
     <section hidden={step !== 2} className="studio-panel"><h2>Lyrics</h2><label>Lyrics<textarea rows={7} value={current.lyrics_text} maxLength={20000} placeholder="Paste lyrics, one line at a time" onChange={event => update({ lyrics_text: event.target.value })} /></label>

@@ -48,6 +48,7 @@ test('draft timeline plays across sections, seeks and replaces only the selected
   await expect(page.locator('.studio-lyric-raster')).toHaveAttribute('alt', 'Second lyric');
   const textPanel = page.getByRole('complementary', { name: 'Text styling' });
   await textPanel.getByLabel('Custom text color').fill('#ff6bae');
+  await textPanel.getByTestId('studio-font-group').locator('summary').click();
   await textPanel.getByRole('button', { name: 'Abel', exact: true }).click();
   await textPanel.getByRole('button', { name: 'Align right' }).click();
   await expect(textPanel.getByLabel('Custom text color')).toHaveValue('#ff6bae');
@@ -56,12 +57,16 @@ test('draft timeline plays across sections, seeks and replaces only the selected
   await page.screenshot({ path: testInfo.outputPath('text-and-video-dark.png'), fullPage: true });
   await expect(page.locator('.studio-autosave')).toHaveText('Saved');
   await section1.click();
-  await page.getByRole('button', { name: 'Play draft', exact: true }).click();
+  await page.getByRole('button', { name: 'Play', exact: true }).click();
   await expect(preview).toHaveJSProperty('paused', false);
   await expect(section2).toHaveAttribute('aria-pressed', 'true', { timeout: 7000 });
   await expect(preview).toHaveAttribute('src', '/test-preview.mp4?clip=1');
-  await page.getByRole('button', { name: 'Pause draft', exact: true }).click();
+  await page.getByRole('button', { name: 'Pause', exact: true }).click();
   await expect(preview).toHaveJSProperty('paused', true);
+  const pausedTime = await page.getByTestId('global-audio').evaluate(el => (el as HTMLAudioElement).currentTime);
+  await page.getByRole('button', {name:'Play',exact:true}).click();
+  await expect.poll(() => page.getByTestId('global-audio').evaluate(el => (el as HTMLAudioElement).currentTime)).toBeGreaterThan(pausedTime);
+  await page.getByRole('button', {name:'Pause',exact:true}).click();
   const position = page.getByRole('slider', { name: 'Draft position' });
   await position.fill('2');
   await expect(section1).toHaveAttribute('aria-pressed', 'true');
@@ -93,7 +98,7 @@ test('draft timeline plays across sections, seeks and replaces only the selected
   await expect(preview).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath('timeline-mobile.png') });
-  await page.getByRole('button', { name: 'Play draft', exact: true }).click();
+  await page.getByRole('button', { name: 'Play', exact: true }).click();
   await page.getByRole('button', { name: '3. Sync', exact: true }).click();
   await expect(page.getByTestId('global-audio')).toHaveJSProperty('paused', true);
 });
@@ -188,6 +193,7 @@ test(`uploaded ${format} clips can be previewed, tagged, filtered and used in a 
   await page.getByRole('button', { name: 'Delete clip', exact: true }).click();
   await expect(page.getByRole('button', { name: /^Select section / })).toHaveCount(3);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await page.getByText('More visual options',{exact:true}).click();
   await page.getByRole('button', { name: 'Clear draft visuals', exact: true }).click();
   await expect(page.getByLabel('Draft preview', { exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'Reroll Visuals', exact: true }).click();

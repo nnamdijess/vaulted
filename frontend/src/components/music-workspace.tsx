@@ -80,7 +80,11 @@ function WorkspaceContent({ projectId, songId }: { projectId?: string; songId?: 
   }
   function openDialog(value: "project" | "tracks") { setDialogError(""); setDialog(value); }
   function onChange(updated: Song) {
-    setSongs((items) => items.map((item) => item.id === updated.id ? updated : item));
+    setSongs((items) => items.map((item) => item.id === updated.id ? updated : item).filter(item => !projectId || item.project_id === Number(projectId)));
+    if (project && updated.project_id !== project.id) {
+      setNotice('Song moved to its new project.');
+      setRevision(value => value + 1);
+    }
     if (songId) { setSong(updated); setRevision((value) => value + 1); }
   }
   function onDelete(id: number) {

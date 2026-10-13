@@ -8,11 +8,11 @@ export function RecentProjects({ projects }: { projects: ContentProject[] }) {
   const [all, setAll] = useState(false);
   function cards(items: ContentProject[]) {
     return <div className="studio-cards">{items.map(project => <Link className="studio-card" key={project.id} href={`/studio/${project.id}`}>
-      {project.cover_path ?
+      <div className="studio-project-art">{project.cover_path ?
         // eslint-disable-next-line @next/next/no-img-element -- private same-origin artwork
-        <img className="studio-cover" alt="Project artwork" src={`/api/projects/${project.project_id}/cover?v=${encodeURIComponent(project.cover_path)}`} /> :
-        <span className="studio-cover studio-cover-fallback" aria-hidden="true">V</span>}
-      <strong>{project.title}</strong><span>{project.song_title} · {project.status}</span>
+        <img className="studio-cover" alt="Project artwork" src={project.song_id ? `/api/songs/${project.song_id}/cover?v=${encodeURIComponent(project.cover_path)}` : `/api/projects/${project.project_id}/cover?v=${encodeURIComponent(project.cover_path)}`} /> :
+        <span className="studio-cover studio-cover-fallback" aria-hidden="true">V</span>}<span className="studio-card-open" aria-hidden="true">↗</span></div>
+      <strong title={project.title}>{project.title}</strong><span className="studio-card-song">{project.song_title}</span><span className="studio-project-status">{project.status}</span>
     </Link>)}</div>;
   }
   return <section aria-label="Recent Content Projects">

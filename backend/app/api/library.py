@@ -84,5 +84,5 @@ def search_songs(db: Database, q: str = Query(default='', max_length=200), offse
              'song_artist': s.artist, 'fallback_artist': s.project.artist or s.project.owner_name,
              'uses_owner_name': not bool(s.project.artist), 'version_name': s.latest_version_name,
              'latest_version_id': s.latest_version_id,
-             'project_name': s.project.name, 'cover_path': s.project.cover_path} for s in songs],
+             'project_name': s.project.name, 'cover_path': s.cover_path if s.cover_path is not None else s.project.cover_path} for s in songs],
             'has_more': len(ids) > 50}

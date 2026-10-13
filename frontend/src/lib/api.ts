@@ -1,6 +1,6 @@
 
 export type Project = { owner_name: string; id: number; name: string; description: string; artist: string; created_at: string; cover_path: string | null; notes: string };
-export type Song = { id: number; project_id: number; title: string; artist: string; bpm: number | null; key: string; status: string; notes: string; created_at: string; position: number; latest_version_name?: string | null; latest_version_id: number | null };
+export type Song = { cover_path?: string | null; id: number; project_id: number; title: string; artist: string; bpm: number | null; key: string; status: string; notes: string; created_at: string; position: number; latest_version_name?: string | null; latest_version_id: number | null };
 export type Version = { id: number; song_id: number; version_name: string; file_path: string; original_filename: string; notes: string; created_at: string };
 
 export function apiUrl(path: string) {

@@ -11,6 +11,7 @@ import { RenderGallery } from './render-gallery';
 import { RecentProjects } from './recent-projects';
 import { StudioEditor } from './editor';
 import './studio.css';
+import './studio-refresh.css';
 import { StudioIcon } from './studio-icon';
 
 export function Studio({ create = false, identifier }: { create?: boolean; identifier?: string }) {
@@ -32,9 +33,9 @@ function Dashboard() {
   </>;
 }
 
-export function Cover({ project }: { project: { project_id: number; cover_path: string | null } }) {
+export function Cover({ project }: { project: { project_id: number; song_id?: number; cover_path: string | null } }) {
   // eslint-disable-next-line @next/next/no-img-element -- private same-origin artwork
-  return project.cover_path ? <img className="studio-cover" alt="Project artwork" src={`/api/projects/${project.project_id}/cover?v=${encodeURIComponent(project.cover_path)}`} /> : <span className="studio-cover studio-cover-fallback" aria-hidden="true">V</span>;
+  return project.cover_path ? <img className="studio-cover" alt="Project artwork" src={project.song_id ? `/api/songs/${project.song_id}/cover?v=${encodeURIComponent(project.cover_path)}` : `/api/projects/${project.project_id}/cover?v=${encodeURIComponent(project.cover_path)}`} /> : <span className="studio-cover studio-cover-fallback" aria-hidden="true">V</span>;
 }
 
 function SongPicker() {

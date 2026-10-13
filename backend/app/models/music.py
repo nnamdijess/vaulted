@@ -47,6 +47,7 @@ class Song(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), index=True)
     position: Mapped[int] = mapped_column(default=1)
+    cover_path: Mapped[str | None] = mapped_column(String(255), nullable=True)
     title: Mapped[str] = mapped_column(String(200))
     artist: Mapped[str] = mapped_column(String(200), default="")
     bpm: Mapped[float | None]

@@ -1,0 +1,72 @@
+import { expect } from '@playwright/test';
+import { test, wav } from './fixtures';
+
+test('move a song on mobile and preserve its Studio draft', async ({page,request}) => {
+  await page.setViewportSize({width:390,height:844});
+  const base='http://127.0.0.1:8011/api';
+  const source=await (await request.post(`${base}/projects`,{data:{name:'Original music'}})).json();
+  const destination=await (await request.post(`${base}/projects`,{data:{name:'New music'}})).json();
+  const [song]=await (await request.post(`${base}/projects/${source.id}/tracks`,{multipart:{files:{name:'Move me.wav',mimeType:'audio/wav',buffer:wav()}}})).json();
+  const draft=await (await request.post(`${base}/studio/projects`,{data:{title:'Keep my draft',song_version_id:song.latest_version_id}})).json();
+  await page.goto(`/projects/${source.id}`);
+  await page.getByRole('button',{name:'Actions for Move me',exact:true}).click();
+  await page.getByRole('button',{name:'Move to project',exact:true}).click();
+  await expect(page.getByText('Current project: Original music')).toBeVisible();
+  await expect(page.getByRole('option',{name:'Original music (current)'})).toHaveAttribute('disabled','');
+  await page.getByLabel('Destination project').selectOption(String(destination.id));
+  await page.getByRole('button',{name:'Move song',exact:true}).click();
+  await expect(page.getByText('Song moved to its new project.')).toBeVisible();
+  await expect(page.getByRole('button',{name:'Actions for Move me',exact:true})).toHaveCount(0);
+  await page.goto(`/projects/${destination.id}`);
+  await expect(page.getByRole('button',{name:'Actions for Move me',exact:true})).toBeVisible();
+  await page.goto(`/studio/${draft.id}`);
+  await expect(page.getByRole('heading',{name:'Move me',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'4. Visuals',exact:true}).click();
+  const slider=page.getByRole('slider',{name:'Lyric vertical position'});
+  await slider.fill('0.735');
+  await expect.poll(async()=> (await (await request.get(`${base}/studio/projects/${draft.id}`)).json()).text_style.text_y).toBe(.735);
+  await page.reload();
+  await page.getByRole('button',{name:'4. Visuals',exact:true}).click();
+  await expect(slider).toHaveValue('0.735');
+  await expect(page.getByRole('button',{name:'Back to Video',exact:true})).toBeDisabled();
+});
+
+test('section playback pauses, resumes, restarts and repeats the final seconds',async({page,request})=>{
+  const base='http://127.0.0.1:8011/api';
+  const music=await (await request.post(`${base}/projects`,{data:{name:'Playback'}})).json();
+  const [song]=await (await request.post(`${base}/projects/${music.id}/tracks`,{multipart:{files:{name:'Timing.wav',mimeType:'audio/wav',buffer:wav()}}})).json();
+  const draft=await (await request.post(`${base}/studio/projects`,{data:{title:'Timing',song_version_id:song.latest_version_id}})).json();
+  await page.goto(`/studio/${draft.id}`);
+  const audio=page.locator('audio');
+  const panel=page.locator('section').filter({has:page.getByRole('heading',{name:'Choose a moment'})});
+  await panel.getByRole('button',{name:'Play',exact:true}).click();
+  await expect.poll(()=>audio.evaluate(el=>(el as HTMLAudioElement).currentTime)).toBeGreaterThan(.2);
+  await panel.getByRole('button',{name:'Pause',exact:true}).click();
+  const paused=await audio.evaluate(el=>(el as HTMLAudioElement).currentTime);
+  await panel.getByRole('button',{name:'Play',exact:true}).click();
+  await expect.poll(()=>audio.evaluate(el=>(el as HTMLAudioElement).currentTime)).toBeGreaterThan(paused);
+  await panel.getByRole('button',{name:'Restart',exact:true}).click();
+  expect(await audio.evaluate(el=>(el as HTMLAudioElement).currentTime)).toBeLessThan(.4);
+  await panel.getByRole('button',{name:'Last 3s',exact:true}).click();
+  await expect(panel.getByRole('button',{name:'Play',exact:true})).toBeVisible({timeout:6000});
+  await panel.getByRole('button',{name:'Last 3s',exact:true}).click();
+  await expect(panel.getByRole('button',{name:'Pause',exact:true})).toBeVisible();
+});
+
+test('short trimmed section stops at its endpoint and a failed play stays paused',async({page,request})=>{
+  const base='http://127.0.0.1:8011/api';
+  const music=await (await request.post(`${base}/projects`,{data:{name:'Trimmed playback'}})).json();
+  const [song]=await (await request.post(`${base}/projects/${music.id}/tracks`,{multipart:{files:{name:'Trim.wav',mimeType:'audio/wav',buffer:wav()}}})).json();
+  const draft=await (await request.post(`${base}/studio/projects`,{data:{title:'Trim',song_version_id:song.latest_version_id}})).json();
+  await request.patch(`${base}/studio/projects/${draft.id}`,{data:{title:'Trim',start_time:.5,end_time:2,lyrics_text:'',aesthetic:'nature',lyric_style:'minimal'}});
+  await page.goto(`/studio/${draft.id}`);
+  const audio=page.getByTestId('global-audio');
+  await page.getByRole('button',{name:'Last 3s',exact:true}).click();
+  expect(await audio.evaluate(el=>(el as HTMLAudioElement).currentTime)).toBeGreaterThanOrEqual(.5);
+  await expect(page.getByRole('button',{name:'Play',exact:true})).toBeVisible();
+  expect(await audio.evaluate(el=>(el as HTMLAudioElement).currentTime)).toBeCloseTo(2,2);
+  await audio.evaluate(el=>{ (el as HTMLAudioElement).play=()=>Promise.reject(new DOMException('Test rejection','NotAllowedError')); });
+  await page.getByRole('button',{name:'Play',exact:true}).click();
+  await expect(page.getByRole('alert').filter({hasText:'Playback could not start'}).first()).toBeVisible();
+  await expect(page.getByRole('button',{name:'Play',exact:true})).toBeVisible();
+});

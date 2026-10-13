@@ -40,6 +40,7 @@ class TextStyle(Input):
     letter_spacing: float = Field(default=0, ge=0, le=0.3)
     font_weight: int = Field(default=400, ge=100, le=900)
     tracking: float = Field(default=0, ge=-2, le=12)
+    text_y: float | None = Field(default=None, ge=0, le=1, allow_inf_nan=False)
     text_x: float = Field(default=0.5, ge=0, le=1)
     last_line_align: Literal['left', 'center', 'right', 'justify'] = 'center'
     line_breaks: dict[str, str] = Field(default_factory=dict, max_length=200)

@@ -249,3 +249,5 @@
 .studio-text-panel details {margin-block:16px;}
 
 .studio-heading .button, .studio-actions > button {display:inline-flex;align-items:center;justify-content:center;gap:6px;}
+
+.studio-draft-preview { scroll-margin-top: calc(env(safe-area-inset-top, 0px) + 24px); }
