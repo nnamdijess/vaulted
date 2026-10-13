@@ -6,6 +6,7 @@ import { AccountArea, LogoutButton, PrivateArea, useAuth, User } from './auth-pr
 import { ThemeSwitch } from './theme-provider';
 import { ImageUpload } from './image-upload';
 import { ProfilePictureMenu } from './profile-picture-menu';
+import { accentHex } from '@/lib/accent-color';
 import { api } from '@/lib/api';
 
 export function Profile() { return <PrivateArea><ProfileContent /></PrivateArea>; }
@@ -42,7 +43,6 @@ function DisplayNameForm({ user, onSave }: { user: User; onSave: (user: User) =>
   return <form onSubmit={submit}><fieldset disabled={busy}><label>Display name<input name="display_name" defaultValue={user.display_name} maxLength={200} required onChange={() => setSaved(false)} /></label><button>{busy ? 'Saving…' : 'Save display name'}</button>{saved && <p role="status">Display name saved.</p>}{error && <p role="alert" className="error">{error}</p>}</fieldset></form>;
 }
 
-const colors: User['accent_color'][] = ['green','blue','purple','pink','orange','teal'];
 function PreferencesForm({ user, onSave }: { user: User; onSave: (user: User) => void }) {
   const { setAccentPreview } = useAuth();
   const [color, setColor] = useState(user.accent_color);
@@ -63,8 +63,8 @@ function PreferencesForm({ user, onSave }: { user: User; onSave: (user: User) =>
     finally { setBusy(false); }
   }
   return <form onSubmit={submit}><fieldset disabled={busy}>
-    <label>Accent color<select name="accent_color" value={color} onChange={e => preview(e.target.value as User['accent_color'])}>{colors.map(color => <option key={color} value={color}>{color[0].toUpperCase() + color.slice(1)}</option>)}</select></label>
-    <div className="accent-swatches" role="group" aria-label="Preview accent color">{colors.map(option => <button type="button" className="accent-swatch" data-color={option} key={option} aria-label={`Preview ${option}`} aria-pressed={color === option} onClick={() => preview(option)}><span aria-hidden="true" />{option}</button>)}</div>
+    <label className="profile-custom-color">Accent color<input aria-label="Accent color picker" type="color" value={accentHex(color)} onChange={e => preview(e.target.value)} /></label>
+    <p className="muted">Preview updates immediately. Light and dark themes adjust the shade for readable contrast. Video colors stay unchanged.</p>
     <label>Library name<input name="library_name" value={library} onChange={e => { setLibrary(e.target.value); setSaved(false); }} required maxLength={60} /></label>
     {dirty && <p role="status">Unsaved preview. Save to keep these preferences.</p>}{saved && <p role="status">Preferences saved.</p>}
     {error && <p role="alert" className="error">{error}</p>}

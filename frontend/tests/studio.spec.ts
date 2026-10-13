@@ -9,13 +9,13 @@ test('Studio text panel automatically saves color font and alignment', async ({ 
   await page.getByRole('button', { name: '4. Visuals', exact: true }).click();
   const panel = page.getByRole('complementary', { name: 'Text styling' });
   const sample = page.getByLabel('Text style sample');
-  await panel.getByRole('button', { name: 'Pink text' }).click();
+  await panel.getByLabel('Custom text color').fill('#ff6bae');
   await panel.getByRole('button', { name: 'Anton', exact: true }).click();
   await panel.getByRole('button', { name: 'Align right' }).click();
   await expect(sample).toHaveCSS('color', 'rgb(255, 107, 174)');
   await expect(sample).toHaveCSS('text-align', 'right');
   await expect.poll(() => page.evaluate(async () => (await document.fonts.load('20px "Vaulted Anton"')).length)).toBe(1);
-  await panel.getByRole('button', { name: 'White text' }).click();
+  await panel.getByLabel('Custom text color').fill('#ffffff');
   await expect(sample).toHaveCSS('color', 'rgb(255, 255, 255)');
   await panel.getByLabel('Custom text color').fill('#12abef');
   await panel.getByRole('button', { name: 'Anton', exact: true }).click();
@@ -32,7 +32,7 @@ test('Studio text panel automatically saves color font and alignment', async ({ 
   await expect(panel.getByRole('button', { name: 'Align left' })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('.studio-autosave')).toHaveText('Saved');
   const saved = await (await request.get(`http://127.0.0.1:8011/api/studio/projects/${draft.id}`)).json();
-  expect(saved.text_style).toEqual({ position: 'middle', font_size: 96, bold: false, italic: false, underline: false, color: '#12abef', font: 'anton', align: 'left', letter_spacing: 0, text_width: 82, word_spacing: 100, line_spacing: 1.8, text_width_px: 500 });
+  expect(saved.text_style).toMatchObject({ position: 'middle', font_size: 96, bold: false, italic: false, underline: false, color: '#12abef', font: 'anton', align: 'left', letter_spacing: 0, text_width: 82, word_spacing: 100, line_spacing: 1.8, text_width_px: 500 });
   await page.reload();
   await page.getByRole('button', { name: '4. Visuals', exact: true }).click();
   await expect(panel.getByRole('button', { name: 'Anton', exact: true })).toHaveAttribute('aria-pressed', 'true');

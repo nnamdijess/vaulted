@@ -2,9 +2,8 @@
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { Modal } from '../modal';
-export function ExportIcon({ name }: { name:'share'|'delete'|'play' }) {
- return <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{name==='share'?<><path d="M12 16V3m-4 4 4-4 4 4M5 12v8h14v-8" /></>:name==='delete'?<><path d="M3 6h18M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7m4-7v7" /></>:<path d="m9 5 10 7-10 7Z" />}</svg>;
-}
+import { StudioIcon as ExportIcon } from './studio-icon';
+export { StudioIcon as ExportIcon } from './studio-icon';
 export function RenderActions({ projectId, jobId, onDeleted }: { projectId:number; jobId:number; onDeleted:()=>void }) {
  const [open,setOpen]=useState(false),[file,setFile]=useState<File|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const url=`/api/studio/projects/${projectId}/renders/${jobId}/video?download=true`;

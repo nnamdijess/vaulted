@@ -47,10 +47,10 @@ test('draft timeline plays across sections, seeks and replaces only the selected
   await expect(preview).toHaveAttribute('src', '/test-preview.mp4?clip=1');
   await expect(page.locator('.studio-lyric-raster')).toHaveAttribute('alt', 'Second lyric');
   const textPanel = page.getByRole('complementary', { name: 'Text styling' });
-  await textPanel.getByRole('button', { name: 'Pink text' }).click();
+  await textPanel.getByLabel('Custom text color').fill('#ff6bae');
   await textPanel.getByRole('button', { name: 'Abel', exact: true }).click();
   await textPanel.getByRole('button', { name: 'Align right' }).click();
-  await expect(textPanel.getByRole('button', { name: 'Pink text' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(textPanel.getByLabel('Custom text color')).toHaveValue('#ff6bae');
   await expect(textPanel.getByRole('button', { name: 'Align right' })).toHaveAttribute('aria-pressed', 'true');
   await page.emulateMedia({ colorScheme: 'dark' });
   await page.screenshot({ path: testInfo.outputPath('text-and-video-dark.png'), fullPage: true });
@@ -150,7 +150,7 @@ test(`uploaded ${format} clips can be previewed, tagged, filtered and used in a 
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.getByRole('button', { name: 'Crop / Zoom' }).click();
   await page.getByRole('slider', { name: 'Crop zoom' }).fill('1.5');
-  await page.getByLabel('Horizontal position').fill('0.2');
+  await page.getByLabel('Horizontal position', {exact:true}).fill('0.2');
   if (!(await page.getByLabel('Clip duration').isVisible())) await page.getByText('Clip options', { exact: true }).click();
   await page.getByRole('slider', { name: 'Timeline zoom' }).fill('100');
   await page.getByLabel('Clip duration').fill('1');

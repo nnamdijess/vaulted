@@ -70,7 +70,7 @@ def command(arguments, cwd, timeout=600):
                             cwd=cwd, capture_output=True, timeout=timeout)
     if result.returncode:
         # Deliberately exclude stderr: source URLs and local paths are private.
-        raise RuntimeError('FFmpeg could not render this media. Check codec and libass support.')
+        raise RuntimeError('FFmpeg could not render this media. Check the source media and H.264/AAC codec support.')
 
 
 def render(job_id, snapshot, update_progress):
@@ -98,13 +98,16 @@ def render(job_id, snapshot, update_progress):
             files.append(f"file '{filename}'")
             update_progress(int(70 * (index + 1) / len(snapshot['clips'])))
         (work / 'clips.txt').write_text('\n'.join(files), encoding='utf-8')
-        (work / 'lyrics.ass').write_text(subtitles(snapshot), encoding='utf-8')
         args = ['-protocol_whitelist', 'file,pipe', '-f', 'concat', '-safe', '1', '-i', 'clips.txt',
-                '-ss', ffmpeg_time(snapshot['start_time']), '-protocol_whitelist', 'file,pipe', '-i', str(audio_path(snapshot['audio_path'])),
-                '-map', '0:v:0', '-map', '1:a:0', '-t', ffmpeg_time(snapshot['end_time'] - snapshot['start_time'])]
+                '-ss', ffmpeg_time(snapshot['start_time']), '-protocol_whitelist', 'file,pipe', '-i', str(audio_path(snapshot['audio_path']))]
         if snapshot['lines']:
-            shutil.copytree(FONT_DIR, work / 'fonts', dirs_exist_ok=True)
-            args += ['-vf', 'subtitles=lyrics.ass:fontsdir=fonts']
+            from app.services.studio_layout import overlay_sequence
+            overlay_sequence(snapshot, work)
+            args += ['-protocol_whitelist', 'file,pipe', '-f', 'concat', '-safe', '0', '-i', 'lyrics.txt',
+                     '-filter_complex_threads', '1', '-filter_complex', '[0:v][2:v]overlay=0:0:eof_action=repeat:format=auto[v]', '-map', '[v]']
+        else:
+            args += ['-map', '0:v:0']
+        args += ['-map', '1:a:0', '-t', ffmpeg_time(snapshot['end_time'] - snapshot['start_time'])]
         args += ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '21', '-pix_fmt', 'yuv420p', '-threads', '2',
                  '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', 'export.mp4']
         command(args, work, timeout=900)

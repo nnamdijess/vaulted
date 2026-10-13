@@ -57,6 +57,8 @@ class StudioTest(unittest.TestCase):
     def test_lyric_and_sync_edits_preserve_visuals(self):
         draft = self.draft()
         style = {'position': None, 'font_size': None, 'bold': False, 'italic': False, 'underline': False, 'font': 'anton', 'color': '#FF9F43', 'align': 'right', 'letter_spacing': 0.1, 'text_width': 60, 'word_spacing': 0, 'line_spacing': 1.2, 'text_width_px': None}
+        from app.schemas.studio import TextStyle
+        style = TextStyle(**style).model_dump()
         self.assertEqual(self.client.put(self.url + '/text-style', json=style).status_code, 200)
         updated = self.edit(lyrics_text='Edited line\nSecond line').json()
         self.assertEqual(updated['clips'], draft['clips'])
@@ -332,6 +334,8 @@ class StudioTest(unittest.TestCase):
         from app.services.studio_renderer import subtitles
         draft = self.draft()
         style = {'position': None, 'font_size': None, 'bold': False, 'italic': False, 'underline': False, 'color': '#12ABEF', 'font': 'anton', 'align': 'right', 'letter_spacing': 0.1, 'text_width': 60, 'word_spacing': 0, 'line_spacing': 1.2, 'text_width_px': None}
+        from app.schemas.studio import TextStyle
+        style = TextStyle(**style).model_dump()
         url = self.url + '/text-style'
         self.assertEqual(self.public.put(url, json=style).status_code, 401)
         self.assertEqual(self.other.put(url, json=style).status_code, 404)

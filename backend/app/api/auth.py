@@ -167,7 +167,7 @@ def remove_avatar(db=Depends(owned_session)):
 class Preferences(BaseModel):
     model_config = ConfigDict(extra='forbid', str_strip_whitespace=True)
     library_name: str = Field(min_length=1, max_length=60)
-    accent_color: Literal['green', 'blue', 'purple', 'pink', 'orange', 'teal']
+    accent_color: str = Field(pattern=r'^(green|blue|purple|pink|orange|teal|#[0-9a-fA-F]{6})$')
 
 
 class ProfileUpdate(BaseModel):

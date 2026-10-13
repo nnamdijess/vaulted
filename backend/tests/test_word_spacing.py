@@ -11,7 +11,7 @@ from app.services.studio_renderer import subtitles
 class WordSpacingTest(unittest.TestCase):
     def test_justified_render_edges_stay_aligned_across_different_words(self):
         style = dict(font='montserrat', font_size=64, align='justify', color='#FFFF00',
-                     text_width_px=600, line_spacing=1.8)
+                     text_width_px=600, line_spacing=1.8, last_line_align='justify')
         data = lyric_png('baby girl i\nlove it\nwhen you\nbend it like\na gymnast', style, 'default')
         alpha = Image.open(BytesIO(data)).convert('RGBA').getchannel('A')
         rows, start = [], None

@@ -13,3 +13,6 @@ FONT_FILES.update({'montserrat': 'Montserrat-Variable.ttf', 'playfair': 'Playfai
 
 FONTS.update({"roboto_mono": "Roboto Mono", "space_grotesk": "Space Grotesk", "atkinson_next": "Atkinson Hyperlegible Next"})
 FONT_FILES.update({"roboto_mono": "RobotoMono-Variable.ttf", "space_grotesk": "SpaceGrotesk-Variable.ttf", "atkinson_next": "AtkinsonHyperlegibleNext-Variable.ttf"})
+
+FONTS.update({'barlow_condensed':'Barlow Condensed','archivo_narrow':'Archivo Narrow','teko':'Teko','fjalla_one':'Fjalla One','saira_condensed':'Saira Condensed','league_gothic':'League Gothic','roboto_condensed':'Roboto Condensed'})
+FONT_FILES.update({'barlow_condensed':'BarlowCondensed-Regular.ttf','archivo_narrow':'ArchivoNarrow-Variable.ttf','teko':'Teko-Variable.ttf','fjalla_one':'FjallaOne-Regular.ttf','saira_condensed':'SairaCondensed-Regular.ttf','league_gothic':'LeagueGothic-Variable.ttf','roboto_condensed':'RobotoCondensed-Variable.ttf'})

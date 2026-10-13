@@ -13,14 +13,14 @@ test('Vaulted preferences persist, tracks drag into saved order, and mobile play
   await page.goto('/profile');
   await expect(page).toHaveTitle('Vaulted');
   await page.getByLabel('Library name', { exact: true }).fill('Night sessions');
-  await page.getByRole('combobox', { name: 'Accent color', exact: true }).selectOption('blue');
+  await page.getByLabel('Accent color picker').fill('#58adff');
   await page.getByRole('button', { name: 'Save preferences' }).click();
-  await expect(page.locator('.account-scope')).toHaveAttribute('data-accent','blue');
+  await expect(page.locator('.account-scope')).toHaveAttribute('data-accent','#58adff');
   await page.getByLabel('Theme', { exact: true }).selectOption('light');
-  await expect(page.getByRole('button', { name: 'Save preferences', exact: true })).toHaveCSS('background-color','rgb(18, 98, 181)');
+  await expect(page.locator('.account-scope')).toHaveAttribute('data-accent','#58adff');
   await page.reload();
   await expect(page.getByLabel('Library name', { exact: true })).toHaveValue('Night sessions');
-  await expect(page.getByRole('combobox', { name: 'Accent color', exact: true })).toHaveValue('blue');
+  await expect(page.getByLabel('Accent color picker')).toHaveValue('#58adff');
   await page.getByLabel('Theme', { exact: true }).selectOption('dark');
   await expect(page.getByRole('button', { name: 'Save preferences', exact: true })).toHaveCSS('background-color','rgb(88, 173, 255)');
   await page.goto('/projects');

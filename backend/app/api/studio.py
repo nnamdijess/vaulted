@@ -80,6 +80,7 @@ def validate_collection(data, db):
 
 @router.post('/aesthetics', status_code=201)
 def create_collection(data: CollectionInput, db: Database):
+    lock_track_order(db)
     validate_collection(data, db)
     item = AestheticCollection(owner_id=db.info['owner_id'], **data.model_dump())
     db.add(item)
@@ -108,10 +109,12 @@ def presets(db: Database):
 
 
 @router.get('/fonts/{font_id}')
-def font_file(font_id: str, db: Database):
+def font_file(font_id: str, db: Database, weight: int = 400):
     if font_id not in FONT_FILES:
         raise HTTPException(404, 'Font not found')
-    return FileResponse(FONT_DIR / FONT_FILES[font_id], media_type='font/ttf',
+    from app.services.studio_layout import load_font
+    _, filename = load_font(font_id, 24, max(100, min(900, weight)))
+    return FileResponse(FONT_DIR / filename, media_type='font/ttf',
                         headers={'Cache-Control': 'private, max-age=86400'})
 
 
@@ -176,6 +179,7 @@ def edit(identifier: int, data: Edit, db: Database):
         raise HTTPException(422, 'Use at most 200 lyric lines, each at most 500 characters')
     section_changed = (project.start_time, project.end_time) != (data.start_time, data.end_time)
     if project.lyrics_text != data.lyrics_text or section_changed:
+        project.text_style = {**project.text_style, 'line_breaks': {}}
         project.lines.clear()
         project.lines.extend(ContentLyricLine(line_index=index, text=line) for index, line in enumerate(lines))
     if section_changed:
@@ -302,6 +306,41 @@ def media_details(identifier: int, data: MediaDetails, db: Database):
     return {'id': media.id, 'favorite': media.favorite, **media.metadata_json}
 
 
+@router.delete('/media/{identifier}', status_code=204)
+def delete_uploaded_media(identifier: int, db: Database):
+    lock_track_order(db)
+    media = owned(db, ContentMedia, identifier)
+    if media.provider != 'upload':
+        raise HTTPException(409, 'Only your uploaded clips can be deleted. Unsave stock footage instead.')
+    if db.scalar(select(ContentClip.id).where(ContentClip.media_id == identifier).limit(1)):
+        raise HTTPException(409, 'This clip is used in a Studio timeline. Remove it from those projects first.')
+    for project in db.scalars(select(ContentProject).where(ContentProject.owner_id == media.owner_id)):
+        if identifier in project.media_pool:
+            raise HTTPException(409, f'This clip is saved in the selection for “{project.title}”. Choose a new selection without this clip and regenerate that draft first.')
+    for collection in db.scalars(select(AestheticCollection).where(AestheticCollection.owner_id == media.owner_id)):
+        if identifier in collection.media_ids:
+            raise HTTPException(409, 'Remove this clip from its saved aesthetic collection first.')
+    for job in db.scalars(select(ContentRenderJob).where(ContentRenderJob.status.in_(['queued', 'rendering']))):
+        if any(clip.get('media_id') == identifier for clip in job.snapshot.get('clips', [])):
+            raise HTTPException(409, 'A pending render uses this clip. Wait for the render to finish.')
+    import re
+    if not re.fullmatch(r'[0-9a-f]{32}', media.provider_id):
+        raise HTTPException(409, 'Unexpected upload location; nothing was deleted.')
+    directory = content_path(f'library/{media.provider_id}')
+    if media.metadata_json.get('local_path') != f'library/{media.provider_id}/video.mp4':
+        raise HTTPException(409, 'Unexpected upload location; nothing was deleted.')
+    try:
+        if directory.exists():
+            shutil.rmtree(directory)
+    except OSError:
+        raise HTTPException(503, 'Could not remove the clip files. Please try again.') from None
+    for project in db.scalars(select(ContentProject).where(ContentProject.owner_id == media.owner_id)):
+        project.media_history = [value for value in project.media_history if value != identifier]
+    db.delete(media)
+    db.commit()
+    return Response(status_code=204)
+
+
 @router.patch('/media/{identifier}')
 def favorite(identifier: int, data: Favorite, db: Database):
     media = owned(db, ContentMedia, identifier)
@@ -312,6 +351,7 @@ def favorite(identifier: int, data: Favorite, db: Database):
 
 @router.post('/projects/{identifier}/draft')
 def draft(identifier: int, data: Draft, db: Database):
+    lock_track_order(db)
     project = owned(db, ContentProject, identifier)
     ids = data.media_ids
     if data.mode == 'selected' or (data.mode == 'reroll' and project.media_pool):
@@ -556,5 +596,5 @@ def preview_lyric(identifier: int, data: LyricPreview, db: Database):
     try:
         image = lyric_png(data.text, data.style.model_dump(), data.preset)
     except (OSError, RuntimeError, subprocess.TimeoutExpired):
-        raise HTTPException(503, 'Could not prepare lyric preview. Check FFmpeg.') from None
+        raise HTTPException(503, 'Could not prepare lyric preview. Check the bundled Studio fonts.') from None
     return Response(image, media_type='image/png', headers={'Cache-Control': 'private, no-store'})

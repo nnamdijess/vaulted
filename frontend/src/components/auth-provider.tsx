@@ -2,11 +2,13 @@
 
 import Link from 'next/link';
 import { SearchButton } from './search-button';
+import { accentHex, readableAccent } from '@/lib/accent-color';
+import type { CSSProperties } from 'react';
 import { createContext, useContext, useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 
-export type User = { id: number; email: string; display_name: string; avatar_path: string | null; library_name: string; accent_color: 'green' | 'blue' | 'purple' | 'pink' | 'orange' | 'teal' };
+export type User = { id: number; email: string; display_name: string; avatar_path: string | null; library_name: string; accent_color: string };
 type Auth = { user: User | null; loading: boolean; setUser: (user: User) => void; setAccentPreview: (color: User["accent_color"] | null) => void };
 const Context = createContext<Auth | null>(null);
 
@@ -21,7 +23,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, []);
-  return <Context.Provider value={{ user, loading, setUser, setAccentPreview }}><div className="account-scope" data-accent={accentPreview ?? user?.accent_color ?? "green"}>{children}</div></Context.Provider>;
+  const accent = accentPreview ?? user?.accent_color ?? 'green';
+  const customStyle = accent.startsWith('#') ? { '--accent-dark': readableAccent(accentHex(accent), false), '--accent-light': readableAccent(accentHex(accent), true) } as CSSProperties : undefined;
+  return <Context.Provider value={{ user, loading, setUser, setAccentPreview }}><div className="account-scope" style={customStyle} data-accent={accentPreview ?? user?.accent_color ?? "green"}>{children}</div></Context.Provider>;
 }
 
 export function useAuth() {

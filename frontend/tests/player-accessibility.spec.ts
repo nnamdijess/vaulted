@@ -15,8 +15,8 @@ test('all accent previews have AA text and essential-control contrast in both th
   await page.goto('/profile');
   for (const theme of ['light','dark']) {
     await page.getByLabel('Theme', { exact: true }).selectOption(theme);
-    for (const color of ['green','blue','purple','pink','orange','teal']) {
-      await page.getByRole('button', { name: `Preview ${color}` }).click();
+    for (const color of ['#9be532','#58adff','#b28aff','#ff75b5','#ff9b42','#30d6bb']) {
+      await page.getByLabel('Accent color picker').fill(color);
       const styles = await page.getByRole('button', { name: 'Save preferences' }).evaluate(button => {
         const b = getComputedStyle(button), main = getComputedStyle(document.querySelector('.theme-scope')!);
         return { text: b.color, accent: b.backgroundColor, background: main.backgroundColor };

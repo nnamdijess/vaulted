@@ -194,3 +194,58 @@
 @font-face { font-family: 'Vaulted Space Grotesk'; src: url('/api/studio/fonts/space_grotesk') format('truetype'); font-display: swap; }
 
 @font-face { font-family: 'Vaulted Atkinson Hyperlegible Next'; src: url('/api/studio/fonts/atkinson_next') format('truetype'); font-display: swap; }
+
+.studio-library-thumb {position:relative;}
+.studio-workspace .studio-library-thumb .studio-delete-clip {position:absolute;right:5px;top:5px;z-index:2;width:44px;min-height:44px;padding:10px;background:#16181bd9;color:#eee !important;border:1px solid #ffffff40;border-radius:10px;}
+@media(hover:hover){.studio-workspace .studio-library-thumb .studio-delete-clip:hover{background:#542b30;color:#ffd7dc !important;border-color:#99505a;}}
+
+@font-face {font-family:'Vaulted Barlow Condensed';src:url('/api/studio/fonts/barlow_condensed?weight=100') format('truetype');font-weight:100;font-display:swap;}
+
+@font-face {font-family:'Vaulted Barlow Condensed';src:url('/api/studio/fonts/barlow_condensed?weight=200') format('truetype');font-weight:200;font-display:swap;}
+
+@font-face {font-family:'Vaulted Barlow Condensed';src:url('/api/studio/fonts/barlow_condensed?weight=300') format('truetype');font-weight:300;font-display:swap;}
+
+@font-face {font-family:'Vaulted Barlow Condensed';src:url('/api/studio/fonts/barlow_condensed?weight=400') format('truetype');font-weight:400;font-display:swap;}
+
+@font-face {font-family:'Vaulted Barlow Condensed';src:url('/api/studio/fonts/barlow_condensed?weight=500') format('truetype');font-weight:500;font-display:swap;}
+
+@font-face {font-family:'Vaulted Barlow Condensed';src:url('/api/studio/fonts/barlow_condensed?weight=600') format('truetype');font-weight:600;font-display:swap;}
+
+@font-face {font-family:'Vaulted Barlow Condensed';src:url('/api/studio/fonts/barlow_condensed?weight=700') format('truetype');font-weight:700;font-display:swap;}
+
+@font-face {font-family:'Vaulted Barlow Condensed';src:url('/api/studio/fonts/barlow_condensed?weight=800') format('truetype');font-weight:800;font-display:swap;}
+
+@font-face {font-family:'Vaulted Barlow Condensed';src:url('/api/studio/fonts/barlow_condensed?weight=900') format('truetype');font-weight:900;font-display:swap;}
+
+@font-face {font-family:'Vaulted Archivo Narrow';src:url('/api/studio/fonts/archivo_narrow') format('truetype');font-weight:100 900;font-display:swap;}
+
+@font-face {font-family:'Vaulted Teko';src:url('/api/studio/fonts/teko') format('truetype');font-weight:100 900;font-display:swap;}
+
+@font-face {font-family:'Vaulted Fjalla One';src:url('/api/studio/fonts/fjalla_one') format('truetype');font-weight:400;font-display:swap;}
+
+@font-face {font-family:'Vaulted Saira Condensed';src:url('/api/studio/fonts/saira_condensed?weight=100') format('truetype');font-weight:100;font-display:swap;}
+
+@font-face {font-family:'Vaulted Saira Condensed';src:url('/api/studio/fonts/saira_condensed?weight=200') format('truetype');font-weight:200;font-display:swap;}
+
+@font-face {font-family:'Vaulted Saira Condensed';src:url('/api/studio/fonts/saira_condensed?weight=300') format('truetype');font-weight:300;font-display:swap;}
+
+@font-face {font-family:'Vaulted Saira Condensed';src:url('/api/studio/fonts/saira_condensed?weight=400') format('truetype');font-weight:400;font-display:swap;}
+
+@font-face {font-family:'Vaulted Saira Condensed';src:url('/api/studio/fonts/saira_condensed?weight=500') format('truetype');font-weight:500;font-display:swap;}
+
+@font-face {font-family:'Vaulted Saira Condensed';src:url('/api/studio/fonts/saira_condensed?weight=600') format('truetype');font-weight:600;font-display:swap;}
+
+@font-face {font-family:'Vaulted Saira Condensed';src:url('/api/studio/fonts/saira_condensed?weight=700') format('truetype');font-weight:700;font-display:swap;}
+
+@font-face {font-family:'Vaulted Saira Condensed';src:url('/api/studio/fonts/saira_condensed?weight=800') format('truetype');font-weight:800;font-display:swap;}
+
+@font-face {font-family:'Vaulted Saira Condensed';src:url('/api/studio/fonts/saira_condensed?weight=900') format('truetype');font-weight:900;font-display:swap;}
+
+@font-face {font-family:'Vaulted League Gothic';src:url('/api/studio/fonts/league_gothic') format('truetype');font-weight:400;font-display:swap;}
+
+@font-face {font-family:'Vaulted Roboto Condensed';src:url('/api/studio/fonts/roboto_condensed') format('truetype');font-weight:100 900;font-display:swap;}
+
+.studio-font-options button {overflow-wrap:anywhere;min-width:0;}
+.studio-text-panel details {margin-block:16px;}
+
+.studio-heading .button, .studio-actions > button {display:inline-flex;align-items:center;justify-content:center;gap:6px;}
