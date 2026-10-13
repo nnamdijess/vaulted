@@ -253,10 +253,37 @@ def favorites(db: Database, q: str = ''):
             if q.casefold() in f"{item.metadata_json.get('title', '')} {item.metadata_json.get('tags', '')}".casefold()]
 
 
+@router.get('/media/duplicates')
+def duplicate_media(db: Database):
+    from app.services.media_duplicates import duplicate_copies
+    lock_track_order(db)
+    try:
+        copies = duplicate_copies(db)
+        db.commit()
+        return copies
+    except OSError:
+        db.rollback()
+        raise HTTPException(503, 'Could not check every clip. Please try again.') from None
+
+
 @router.post('/media/upload', status_code=201)
 def upload_media(db: Database, file: UploadFile):
-    identifier, metadata = ingest_video(file)
+    identifier = None
     try:
+        from app.services.media_duplicates import find_match, source_match, upload_digest
+        source_hash = upload_digest(file)
+        lock_track_order(db)
+        existing = source_match(db, source_hash)
+        db.commit()
+        if existing is not None:
+            return {'id': existing.id, 'favorite': existing.favorite, **existing.metadata_json, 'duplicate': True}
+        identifier, metadata = ingest_video(file)
+        lock_track_order(db)
+        existing = find_match(db, metadata)
+        if existing is not None:
+            db.commit()
+            shutil.rmtree(content_path(f'library/{identifier}'), ignore_errors=True)
+            return {'id': existing.id, 'favorite': existing.favorite, **existing.metadata_json, 'duplicate': True}
         media = ContentMedia(owner_id=db.info['owner_id'], provider='upload', provider_id=identifier,
                              metadata_json=metadata, favorite=True)
         db.add(media)
@@ -267,7 +294,8 @@ def upload_media(db: Database, file: UploadFile):
         return {'id': media.id, 'favorite': True, **media.metadata_json}
     except Exception:
         db.rollback()
-        shutil.rmtree(content_path(f'library/{identifier}'), ignore_errors=True)
+        if identifier is not None:
+            shutil.rmtree(content_path(f'library/{identifier}'), ignore_errors=True)
         raise
     finally:
         file.file.close()

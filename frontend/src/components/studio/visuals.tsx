@@ -92,7 +92,7 @@ export function Visuals({ project, setProject, disabled: baseDisabled, pause, ru
         }}>{value === 'library' ? 'My clips' : value === 'upload' ? 'Upload media' : 'Search'}</button>)}
     </div>
     <div role="tabpanel" id={`media-panel-${tab}`} aria-labelledby={`media-tab-${tab}`}>
-    {tab !== 'search' && <ClipLibraryTools mode={tab === 'upload' ? 'upload' : 'library'} disabled={disabled} run={run} onResults={items => { setResults(items); setReviewed(true); }} />}
+    {tab !== 'search' && <ClipLibraryTools mode={tab === 'upload' ? 'upload' : 'library'} disabled={disabled} run={run} onResults={items => { setResults(current => tab === 'upload' ? [...current.filter(item => !items.some(upload => upload.id === item.id)), ...items] : items); setReviewed(true); }} />}
     {libraryError && <p role="alert">{libraryError}</p>}
     {tab === 'library' && <label>Clip source<select aria-label="Clip source" value={librarySource} onChange={event => setLibrarySource(event.target.value)}><option value="all">Uploaded and saved</option><option value="upload">My uploads only</option><option value="stock">Saved stock only</option></select></label>}
     {tab === 'search' && <>

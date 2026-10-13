@@ -1,5 +1,6 @@
 """Private, bounded video ingestion; normalize phone codecs for browser playback."""
 import re
+import hashlib
 import shutil
 import subprocess
 import uuid
@@ -31,11 +32,13 @@ def _ingest_video(upload):
     source = directory / f'source{suffix}'
     try:
         total = 0
+        source_hash = hashlib.sha256()
         with source.open('wb') as output:
             while chunk := upload.file.read(65536):
                 total += len(chunk)
                 if total > settings.max_upload_bytes:
                     raise HTTPException(413, 'Video exceeds the upload size limit (250 MiB by default).')
+                source_hash.update(chunk)
                 output.write(chunk)
         # Force a self-contained container, rather than accepting playlists or URLs.
         container = {'.webm': 'matroska', '.gif': 'gif'}.get(suffix, 'mov')
@@ -64,7 +67,7 @@ def _ingest_video(upload):
             raise HTTPException(422, 'Could not create the video preview.')
         source.unlink()
         return identifier, {'provider': 'upload', 'provider_id': identifier, 'duration': duration,
-            'title': Path(upload.filename).stem[:200], 'tags': '',
+            'title': Path(upload.filename).stem[:200], 'tags': '', 'source_sha256': source_hash.hexdigest(),
             'local_path': f'library/{identifier}/video.mp4', 'source_url': ''}
     except (OSError, subprocess.SubprocessError):
         shutil.rmtree(directory, ignore_errors=True)
