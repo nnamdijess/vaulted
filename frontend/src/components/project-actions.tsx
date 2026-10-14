@@ -12,8 +12,8 @@ export type ProjectAction = 'Insights' | 'Notes' | 'Share project' | 'Change cov
 type Share = { enabled: boolean; allow_downloads: boolean; token: string | null };
 type Insights = { total: number; owner: number; shared: number; most_played: string | null; songs: { id: number; title: string; streams: number }[]; recent: { title: string; source: string; timestamp: string }[] };
 
-export function ProjectActions({ project, songs, action, setAction, onChange }: {
-  project: Project; songs: Song[]; action: ProjectAction | null; setAction: (action: ProjectAction | null) => void;
+export function ProjectActions({ project, songs, action, setAction, onChange, onDeleted }: {
+  onDeleted?:()=>void; project: Project; songs: Song[]; action: ProjectAction | null; setAction: (action: ProjectAction | null) => void;
   onChange: (project: Project) => void;
 }) {
   const [menu, setMenu] = useState(false);
@@ -51,8 +51,10 @@ export function ProjectActions({ project, songs, action, setAction, onChange }: 
       if (action === 'Notes') onChange(await api<Project>(`/projects/${project.id}/notes`, { ...postJson({ notes: value('notes') }), method: 'PATCH' }));
       if (action === 'Project settings') onChange(await api<Project>(`/projects/${project.id}`, { ...postJson(Object.fromEntries(data)), method: 'PATCH' }));
       if (action === 'Delete project') {
+        const removedSongs = songs.length ? songs : await api<Song[]>(`/projects/${project.id}/songs`);
         await api(`/projects/${project.id}`, { method: 'DELETE' });
-        player.removeSongs(songs.map((song) => song.id));
+        player.removeSongs(removedSongs.map((song) => song.id));
+        onDeleted?.();
         router.push('/projects');
       }
       setAction(null);

@@ -60,10 +60,8 @@ class DuplicateUploadTest(unittest.TestCase):
         self.assertEqual(self.other.get('/api/studio/media/duplicates').json(), [])
         self.assertEqual(self.public.get('/api/studio/media/duplicates').status_code, 401)
         self.client.post(self.url+'/draft', json={'media_ids':[identifier]})
-        self.assertEqual(self.client.delete(f'/api/studio/media/{identifier}').status_code, 409)
-        self.assertTrue(copied.exists())
-        self.client.delete(self.url)
         self.assertEqual(self.client.delete(f'/api/studio/media/{identifier}').status_code, 204)
+        self.assertEqual(self.client.get(self.url).json()['clips'][0]['media']['provider'], 'placeholder')
         self.assertFalse(copied.exists())
         self.assertTrue(content_path(original['local_path']).is_file())
 

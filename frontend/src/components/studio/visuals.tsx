@@ -2,6 +2,7 @@
 import { Dispatch, SetStateAction, useEffect, useRef, useState } from 'react';
 import { api, postJson } from '@/lib/api';
 import { ContentProject, Media } from '@/lib/studio';
+import { MediaFolders, MoveMedia, MediaFolder } from './media-folders';
 import { ClipLibraryTools, ClipDetails } from './clip-library';
 import { DraftTimeline } from './draft-timeline';
 import { useEditorAutosave } from './use-editor-autosave';
@@ -14,6 +15,9 @@ import { TextStylePanel } from './text-style-panel';
 import { TextStyle, resolveTextStyle } from '@/lib/studio-text-style';
 
 export function Visuals({ project, setProject, disabled: baseDisabled, pause, run, timelineDirty, onTimelineDirty, pendingStyle, setPendingStyle, selected, setSelected }: { timelineDirty: boolean; onTimelineDirty: (dirty: boolean) => void; pendingStyle: TextStyle | null; setPendingStyle: Dispatch<SetStateAction<TextStyle | null>>; selected: number[]; setSelected: Dispatch<SetStateAction<number[] | null>>; project: ContentProject; setProject: (project: ContentProject) => void; disabled: boolean; pause: () => void; run: (work: () => Promise<void>) => Promise<void> }) {
+  const [folders,setFolders]=useState<MediaFolder[]>([]);
+  const [folder,setFolder]=useState('all');
+  const [folderRevision,setFolderRevision]=useState(0);
   const [deleting, setDeleting] = useState<Media | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState('');
@@ -69,12 +73,12 @@ export function Visuals({ project, setProject, disabled: baseDisabled, pause, ru
     setBrowsing(true);
     requestAnimationFrame(() => { browser.current?.scrollIntoView({ block: 'start' }); browser.current?.querySelector('input')?.focus({ preventScroll: true }); });
   }
-  const shown = tab === 'library' ? results.filter(item => librarySource === 'all' || (librarySource === 'upload' ? item.provider === 'upload' : item.provider !== 'upload')) : results;
-  return <section className="studio-panel studio-visuals"><h2>4. Visuals</h2><p>Build with your clips, or discover footage from <a href="https://pixabay.com/" target="_blank" rel="noreferrer">Pixabay</a> and <a href="https://www.pexels.com/" target="_blank" rel="noreferrer">Pexels</a>. Select a timeline clip to adjust its crop and position in the vertical frame.</p>
+  const shown = tab === 'library' ? results.filter(item => (folder === 'all' || (folder === 'unfiled' ? item.provider === 'upload' && !item.folder_id : String(item.folder_id) === folder)) && (librarySource === 'all' || (librarySource === 'upload' ? item.provider === 'upload' : item.provider !== 'upload'))) : results;
+  return <section className="studio-panel studio-visuals"><h2>4. Visuals</h2><p>Build with your clips, or discover footage from <a href="https://pixabay.com/" target="_blank" rel="noreferrer">Pixabay</a> and <a href="https://www.pexels.com/" target="_blank" rel="noreferrer">Pexels</a>. Select a timeline clip to adjust its crop and position in the selected frame.</p>
     <div className="studio-autosave" role="status" aria-live="polite">{autosave.status === 'saved' ? 'Saved' : autosave.status === 'error' ? 'Not saved' : 'Saving…'}{autosave.error && <><span role="alert">{autosave.error}</span><button onClick={autosave.retry}>Retry saving</button></>}</div>
     <div className="studio-visual-layout">
       <div ref={draft}><DraftTimeline clips={autosave.edits.clips ?? project.clips} onEdit={clips => autosave.queue({ clips })} saving={timelineDirty} project={project} textStyle={textStyle} disabled={baseDisabled} onReplace={item => { setReplace(item.id); openBrowser(); }} /></div>
-      <TextStylePanel lyrics={project.lines.map(line => line.text)} value={textStyle} disabled={baseDisabled}
+      <TextStylePanel outputFormat={project.output_format} lyrics={project.lines.map(line => line.text)} value={textStyle} disabled={baseDisabled}
         onChange={value => { setPendingStyle(value); autosave.queue({ text_style: value }); }} />
     </div>
     <div className="studio-actions"><button disabled={disabled} onClick={() => { openBrowser(); void run(review); }}>Review Media</button>
@@ -96,6 +100,7 @@ export function Visuals({ project, setProject, disabled: baseDisabled, pause, ru
     <div role="tabpanel" id={`media-panel-${tab}`} aria-labelledby={`media-tab-${tab}`}>
     {tab !== 'search' && <ClipLibraryTools mode={tab === 'upload' ? 'upload' : 'library'} disabled={disabled} run={run} onResults={items => { setResults(current => tab === 'upload' ? [...current.filter(item => !items.some(upload => upload.id === item.id)), ...items] : items); setReviewed(true); }} />}
     {libraryError && <p role="alert">{libraryError}</p>}
+    {tab === 'library' && <MediaFolders folders={folders} setFolders={setFolders} folder={folder} onFolder={setFolder} revision={folderRevision} disabled={disabled} />}
     {tab === 'library' && <label>Clip source<select aria-label="Clip source" value={librarySource} onChange={event => setLibrarySource(event.target.value)}><option value="all">Uploaded and saved</option><option value="upload">My uploads only</option><option value="stock">Saved stock only</option></select></label>}
     {tab === 'search' && <>
       <StockSettings project={project} onSaved={setProject} disabled={disabled} run={run} />
@@ -112,13 +117,13 @@ export function Visuals({ project, setProject, disabled: baseDisabled, pause, ru
         {!!selected.length && <button disabled={disabled} onClick={() => void run(() => generate('selected'))}>Generate selected draft</button>}</div>
       {!!shown.length && new Set([...selected, ...shown.map(item => item.id)]).size > 1000 && <p>These results exceed the 1,000-clip limit. Filter your saved clips or clear your selection first.</p>}
     </>}
-    <div className="studio-media-grid">{shown.map(media => <article key={media.id}><div className="studio-library-thumb">{media.provider === 'upload' && <button className="studio-delete-clip" aria-label={`Delete uploaded clip ${media.title || media.tags}`} disabled={disabled} onClick={() => { setDeleting(media); setDeleteError(''); }}><ExportIcon name="delete" /></button>}<ClipPreview key={media.preview_url} media={media} label={`Preview ${media.tags}`} onPlay={pause} /></div><small>{media.title || media.tags} · {media.duration.toFixed(1)}s</small><ClipDetails media={media} disabled={disabled} run={run} onSaved={updated => setResults(items => items.map(item => item.id === updated.id ? updated : item))} /><MediaCredit media={media} /><div className="studio-actions"><button disabled={disabled || (replace === null && selected.length >= 1000 && !selected.includes(media.id))} aria-pressed={selected.includes(media.id)} onClick={() => {
+    <div className="studio-media-grid">{shown.map(media => <article key={media.id}><div className="studio-library-thumb">{media.provider === 'upload' && <button className="studio-delete-clip" aria-label={`Delete uploaded clip ${media.title || media.tags}`} disabled={disabled} onClick={() => { setDeleting(media); setDeleteError(''); }}><ExportIcon name="delete" /></button>}<ClipPreview key={media.preview_url} media={media} label={`Preview ${media.tags}`} onPlay={pause} /></div><small>{media.title || media.tags} · {media.duration.toFixed(1)}s</small><ClipDetails media={media} disabled={disabled} run={run} onSaved={updated => setResults(items => items.map(item => item.id === updated.id ? updated : item))} />{media.provider === 'upload' && <MoveMedia media={media} folders={folders} disabled={disabled} onMoved={updated=>{setResults(items=>items.map(item=>item.id===updated.id?updated:item));setFolderRevision(value=>value+1);}} />}<MediaCredit media={media} /><div className="studio-actions"><button disabled={disabled || (replace === null && selected.length >= 1000 && !selected.includes(media.id))} aria-pressed={selected.includes(media.id)} onClick={() => {
       if (replace !== null) void run(async () => { setProject(await api<ContentProject>(`/studio/projects/${project.id}/clips/${replace}`, { ...postJson({ media_id: media.id }), method: 'PUT' })); closeBrowser(); });
       else setSelected(selected.includes(media.id) ? selected.filter(id => id !== media.id) : [...selected, media.id]);
     }}>{replace !== null ? 'Use replacement' : selected.includes(media.id) ? 'Deselect' : 'Select'}</button>{media.provider !== 'upload' && <button disabled={disabled} aria-pressed={media.favorite} onClick={() => void run(async () => { await api(`/studio/media/${media.id}`, { ...postJson({ favorite: !media.favorite }), method: 'PATCH' }); setResults(results.map(item => item.id === media.id ? { ...item, favorite: !item.favorite } : item)); })}>{media.favorite ? 'Unsave' : 'Save clip'}</button>}</div></article>)}</div>
     {!!selected.length && <button disabled={disabled} onClick={() => void run(() => generate('selected'))}>Generate Draft ({selected.length} clips)</button>}
     <div className="studio-actions"><button type="button" onClick={() => browser.current?.scrollIntoView({ block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })}><ExportIcon name="up" /> Back to top</button></div>
     </div></div>
-    {deleting && <Modal title="Delete uploaded clip" busy={deleteBusy} onClose={() => setDeleting(null)}><p>Delete “{deleting.title || deleting.tags}” from your library and this server? This permanently deletes its video and thumbnail, not just the current selection.</p><p>Clips used by saved projects or pending renders cannot be deleted.</p>{deleteError && <p role="alert">{deleteError}</p>}<div className="studio-actions"><button disabled={deleteBusy} onClick={() => setDeleting(null)}>Cancel</button><button disabled={deleteBusy} onClick={async () => { setDeleteBusy(true); setDeleteError(''); try { await api(`/studio/media/${deleting.id}`, { method: 'DELETE' }); setResults(items => items.filter(item => item.id !== deleting.id)); setSelected(items => (items ?? []).filter(id => id !== deleting.id)); setDeleting(null); } catch (error) { setDeleteError((error as Error).message); } finally { setDeleteBusy(false); } }}>Delete clip permanently</button></div></Modal>}
+    {deleting && <Modal title="Delete uploaded clip" busy={deleteBusy} onClose={() => setDeleting(null)}><p>Delete “{deleting.title || deleting.tags}” from your library and this server? If it is used in Studio projects, those clips will be replaced with a black screen. Your timeline timing and lyrics will be preserved.</p><p>Files needed by a pending render are removed after that render finishes.</p>{deleteError && <p role="alert">{deleteError}</p>}<div className="studio-actions"><button disabled={deleteBusy} onClick={() => setDeleting(null)}>Cancel</button><button disabled={deleteBusy} onClick={async () => { setDeleteBusy(true); setDeleteError(''); try { await api(`/studio/media/${deleting.id}`, { method: 'DELETE' }); setResults(items => items.filter(item => item.id !== deleting.id)); setSelected(items => (items ?? []).filter(id => id !== deleting.id)); setFolderRevision(value=>value+1); pause(); setProject(await api<ContentProject>(`/studio/projects/${project.id}`)); setDeleting(null); } catch (error) { setDeleteError((error as Error).message); } finally { setDeleteBusy(false); } }} className="studio-destructive">Delete and Replace</button></div></Modal>}
   </section>;
 }

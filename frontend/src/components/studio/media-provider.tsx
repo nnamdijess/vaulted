@@ -1,6 +1,7 @@
 import { Media } from '@/lib/studio';
 
 export function MediaCredit({ media }: { media: Media }) {
+  if (media.provider === 'placeholder') return <small>Black screen replacement</small>;
   if (media.provider === 'upload') return <small>Your upload</small>;
   return <a href={media.source_url} target="_blank" rel="noreferrer">
     {media.author ? `Video by ${media.author} on ` : 'View on '}{media.provider === 'pexels' ? 'Pexels' : 'Pixabay'}

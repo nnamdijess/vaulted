@@ -40,6 +40,9 @@ def worker_lock():
 
 
 def process_one():
+    from app.services.media_cleanup import cleanup_deleted_media
+    with SessionLocal() as cleanup_db:
+        cleanup_deleted_media(cleanup_db)
     with SessionLocal() as db:
         job = db.scalar(select(ContentRenderJob).where(ContentRenderJob.status == 'queued').order_by(ContentRenderJob.id).limit(1))
         if not job:
@@ -70,6 +73,7 @@ def process_one():
         if project.revision == snapshot['revision']:
             project.status = status
         db.commit()
+        cleanup_deleted_media(db)
     return True
 
 

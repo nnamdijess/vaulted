@@ -8,6 +8,11 @@ def upgrade_local_database(engine: Engine) -> None:
     with engine.begin() as connection:
         # Serialize startup upgrades when multiple local workers start together.
         connection.exec_driver_sql("BEGIN IMMEDIATE")
+        if inspect(connection).has_table('content_media'):
+            columns = {c['name'] for c in inspect(connection).get_columns('content_media')}
+            if 'folder_id' not in columns:
+                connection.exec_driver_sql('ALTER TABLE content_media ADD COLUMN folder_id INTEGER REFERENCES media_folders(id)')
+            connection.exec_driver_sql('CREATE INDEX IF NOT EXISTS ix_content_media_folder_id ON content_media(folder_id)')
         if inspect(connection).has_table('content_clips'):
             columns = {c['name'] for c in inspect(connection).get_columns('content_clips')}
             if 'framing' not in columns:
@@ -21,6 +26,8 @@ def upgrade_local_database(engine: Engine) -> None:
                         FROM content_media WHERE content_media.id=content_clips.media_id) + 0.02""")
         if inspect(connection).has_table('content_projects'):
             columns = {c['name'] for c in inspect(connection).get_columns('content_projects')}
+            if 'output_format' not in columns:
+                connection.exec_driver_sql("ALTER TABLE content_projects ADD COLUMN output_format VARCHAR(10) NOT NULL DEFAULT '9:16'")
             if 'media_history' not in columns:
                 connection.exec_driver_sql("ALTER TABLE content_projects ADD COLUMN media_history JSON NOT NULL DEFAULT '[]'")
             if 'media_pool' not in columns:

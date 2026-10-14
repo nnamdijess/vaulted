@@ -1,0 +1,41 @@
+.music-library { max-width:1200px; padding-bottom:calc(150px + env(safe-area-inset-bottom)); }
+.music-library .library-header { gap:16px; padding-block:12px 24px; }
+.music-library .brand { display:flex; align-items:center; gap:12px; min-width:0; font-size:24px; }
+.music-library .brand span { overflow-wrap:anywhere; }
+.music-library .brand .brand-mark { width:40px; height:40px; }
+.music-library .library-menu-toggle { display:none; }
+.music-library .library-header .library-menu-toggle { color:var(--text) !important; }
+.music-library .library-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:40px 28px; margin-block:32px 60px; }
+.music-library .library-card { min-width:0; }
+.music-library .library-art { position:relative; margin-bottom:20px; }
+.music-library .library-art .album-cover { width:100%; height:auto; aspect-ratio:1; border-radius:24px; overflow:hidden; box-shadow:0 10px 25px #0001; }
+.music-library .library-art-play { position:absolute; right:-6px; bottom:-6px; width:54px; height:54px; min-height:44px; padding:15px; border-radius:18px; background:var(--text); color:var(--background); border:1px solid var(--border); box-shadow:0 5px 14px #0002; }
+.music-library .library-card-title { display:flex; align-items:start; justify-content:space-between; gap:8px; }
+.music-library .library-card h2 { font-size:18px; line-height:1.35; margin:0; overflow-wrap:anywhere; }
+.music-library .library-card p { margin:4px 0 0; overflow-wrap:anywhere; }
+.music-library .album-header { display:grid; grid-template-columns:minmax(220px,380px) minmax(0,1fr); align-items:center; gap:48px; border:0; margin-block:40px; }
+.music-library .album-header > .album-cover { width:100%; height:auto; aspect-ratio:1; border-radius:26px; overflow:hidden; }
+.music-library .album-header h1 { font-size:clamp(28px,4vw,48px); line-height:1.1; overflow-wrap:anywhere; }
+.music-library .album-buttons { display:flex; flex-wrap:wrap; gap:12px; }
+.music-library .album-buttons .secondary { flex:1; justify-content:center; min-width:140px; border:0; background:color-mix(in srgb,var(--text) 7%,var(--background)); }
+.music-library .track-list { border:0; }
+.music-library .track-row { border:0; border-radius:12px; padding-block:16px; gap:12px; }
+.music-library .track-row.is-current { background:color-mix(in srgb,var(--accent) 9%,var(--background)); }
+.music-library .track-title { min-width:0; }
+.music-library .track-title a { overflow-wrap:anywhere; font-size:17px; }
+.music-library .track-title time { margin-top:5px; }
+.music-library .reorder-help { font-size:12px; opacity:.8; }
+.music-library :is(button,a):focus-visible { outline:2px solid var(--accent); outline-offset:4px; }
+@media(max-width:1000px){.music-library .library-grid {grid-template-columns:repeat(3,minmax(0,1fr));}.music-library .album-header{gap:24px;}}
+@media(max-width:650px){
+ .music-library .library-header {gap:10px;}.music-library .library-menu-toggle{display:block;min-width:44px;padding:8px;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:14px;}
+ .music-library .brand {font-size:20px;flex:1;}.music-library .brand .brand-mark{display:none;}.music-library .account-area{gap:6px;}
+ .music-library .library-navigation:not(.is-open){display:none;}
+ .music-library .library-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:32px 22px;margin-top:24px;}
+ .music-library .library-art .album-cover{border-radius:20px;}.music-library .library-art-play{width:46px;height:46px;border-radius:15px;padding:12px;}
+ .music-library .library-card h2{font-size:16px;}.music-library .library-card-title{gap:0;}.music-library .library-card .muted{font-size:14px;}
+ .music-library .album-header{grid-template-columns:1fr;gap:24px;margin-top:24px;}.music-library .album-header>.album-cover{max-width:320px;justify-self:center;}
+ .music-library .album-buttons{display:grid;grid-template-columns:auto 1fr;}.music-library .track-row{gap:5px;padding-block:14px;}
+ .music-library .section-heading{gap:12px;align-items:center;}.music-library .section-heading h1{font-size:28px;}
+}
+@media(max-width:340px){.music-library .library-grid{grid-template-columns:1fr;}.music-library .brand{font-size:17px;}}

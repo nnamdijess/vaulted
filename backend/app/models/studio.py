@@ -1,6 +1,6 @@
 """Studio metadata. Media bytes remain in private disk storage."""
 from datetime import datetime
-from sqlalchemy import DateTime, ForeignKey, JSON, String, Text
+from sqlalchemy import DateTime, ForeignKey, JSON, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.session import Base
 from app.models.music import utc_now
@@ -18,6 +18,7 @@ class ContentProject(Base):
     end_time: Mapped[float]
     lyrics_text: Mapped[str] = mapped_column(Text, default='')
     aesthetic: Mapped[str] = mapped_column(String(40), default='night-drive')
+    output_format: Mapped[str] = mapped_column(String(10), default='9:16')
     lyric_style: Mapped[str] = mapped_column(String(40), default='minimal')
     media_pool: Mapped[list] = mapped_column(JSON, default=list)
     media_history: Mapped[list] = mapped_column(JSON, default=list)
@@ -47,6 +48,7 @@ class ContentMedia(Base):
     provider: Mapped[str] = mapped_column(String(30), default='pixabay')
     provider_id: Mapped[str] = mapped_column(String(80))
     metadata_json: Mapped[dict] = mapped_column(JSON)
+    folder_id: Mapped[int | None] = mapped_column(ForeignKey('media_folders.id'), index=True)
     favorite: Mapped[bool] = mapped_column(default=False)
 
 
@@ -84,3 +86,22 @@ class ContentRenderJob(Base):
     error: Mapped[str | None] = mapped_column(Text)
     output_path: Mapped[str | None] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class MediaFolder(Base):
+    __tablename__ = 'media_folders'
+    __table_args__ = (UniqueConstraint('owner_id', 'name_key'),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey('users.id'), index=True)
+    name: Mapped[str] = mapped_column(String(80))
+    name_key: Mapped[str] = mapped_column(String(160))
+
+
+class MediaCleanup(Base):
+    """Durable file cleanup, committed atomically with removal from the library."""
+    __tablename__ = 'media_cleanup'
+    id: Mapped[int] = mapped_column(primary_key=True)
+    media_id: Mapped[int] = mapped_column(index=True)
+    directory: Mapped[str] = mapped_column(String(255), unique=True)
+    attempts: Mapped[int] = mapped_column(default=0)
+    error: Mapped[str | None] = mapped_column(String(200))

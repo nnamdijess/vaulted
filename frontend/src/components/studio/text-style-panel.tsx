@@ -1,10 +1,12 @@
 "use client";
 import { useState } from 'react';
 import { TextStyle, studioFonts, lyricCss, fontWeights } from '@/lib/studio-text-style';
+import { OutputFormat, outputDimensions } from '@/lib/studio';
 
-export function TextStylePanel({ value, onChange, disabled, lyrics = [] }: {
-  lyrics?: string[]; value: TextStyle; onChange: (value: TextStyle) => void; disabled: boolean;
+export function TextStylePanel({ value, onChange, disabled, lyrics = [], outputFormat = '9:16' }: {
+  lyrics?: string[]; value: TextStyle; onChange: (value: TextStyle) => void; disabled: boolean; outputFormat?: OutputFormat;
 }) {
+  const widthScale = outputDimensions(outputFormat)[0] / 1080;
   const [fontQuery, setFontQuery] = useState('');
   const fontName = value.font === 'default' ? 'Default' : studioFonts[value.font].replace('Vaulted ', '');
   const weights = fontWeights(value.font);
@@ -47,7 +49,7 @@ export function TextStylePanel({ value, onChange, disabled, lyrics = [] }: {
     <fieldset disabled={disabled}><legend>Spacing</legend>
       <label>Word spacing: {value.word_spacing ?? 0}px<input aria-label="Word spacing" type="range" min="0" max="160" step="1" value={value.word_spacing ?? 0} onChange={event => onChange({ ...value, letter_spacing: 0, word_spacing: Number(event.target.value) })} /></label>
       <label>Line spacing: {(value.line_spacing ?? 1.2).toFixed(1)}×<input aria-label="Line spacing" type="range" min="1" max="2.5" step="0.1" value={value.line_spacing ?? 1.2} onChange={event => onChange({ ...value, line_spacing: Number(event.target.value) })} /></label>
-      <label>Text width: {value.text_width_px ?? Math.round((value.text_width ?? 82) * 10.8)}px<input aria-label="Text width" type="range" min="240" max="972" step="1" value={value.text_width_px ?? Math.round((value.text_width ?? 82) * 10.8)} onChange={event => onChange({ ...value, text_width_px: Number(event.target.value) })} /></label>
+      <label>Text width: {Math.round((value.text_width_px ?? (value.text_width ?? 82) * 10.8) * widthScale)}px<input aria-label="Text width" type="range" min={Math.round(240 * widthScale)} max={Math.round(972 * widthScale)} step="1" value={Math.round((value.text_width_px ?? (value.text_width ?? 82) * 10.8) * widthScale)} onChange={event => onChange({ ...value, text_width_px: Math.round(Number(event.target.value) / widthScale) })} /></label>
       <small>Pixels in the 1080 × 1920 export. Narrow the box to wrap words onto shorter lines.</small>
     </fieldset>
     </details>

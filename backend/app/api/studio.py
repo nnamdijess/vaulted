@@ -6,8 +6,8 @@ from fastapi.responses import FileResponse
 from sqlalchemy import select, or_
 from app.api.music import Database, require_record, lock_track_order
 from app.models.music import Song, SongVersion, Project, utc_now
-from app.models.studio import ContentProject, ContentLyricLine, ContentMedia, ContentClip, ContentRenderJob, AestheticCollection
-from app.schemas.studio import Create, Edit, Timing, Search, Draft, Replace, Favorite, CollectionInput, TextStyle, Timeline, LyricPreview, EditorChanges
+from app.models.studio import ContentProject, ContentLyricLine, ContentMedia, ContentClip, ContentRenderJob, AestheticCollection, MediaFolder, MediaCleanup
+from app.schemas.studio import Create, Edit, Timing, Search, Draft, Replace, Favorite, CollectionInput, TextStyle, Timeline, LyricPreview, EditorChanges, FolderInput, FolderMove
 from app.services.studio_fonts import FONT_DIR, FONT_FILES
 from app.services.studio_presets import RECIPES, STYLES
 from app.services.studio_storage import duration, content_path
@@ -26,14 +26,14 @@ def owned(db, model, identifier):
 
 
 def job_view(job):
-    return {key: getattr(job, key) for key in ('id', 'status', 'progress', 'error', 'created_at')} | {'revision': job.snapshot['revision']}
+    return {key: getattr(job, key) for key in ('id', 'status', 'progress', 'error', 'created_at')} | {'revision': job.snapshot['revision'], 'output_format': job.snapshot.get('output_format', '9:16')}
 
 
 def view(project, db):
     version = require_record(db, SongVersion, project.song_version_id)
     song = version.song
     return {key: getattr(project, key) for key in ('id', 'title', 'song_id', 'song_version_id', 'status', 'start_time', 'end_time',
-             'lyrics_text', 'aesthetic', 'lyric_style', 'media_pool', 'text_style', 'revision', 'created_at', 'updated_at')} | {
+             'lyrics_text', 'aesthetic', 'output_format', 'lyric_style', 'media_pool', 'text_style', 'revision', 'created_at', 'updated_at')} | {
         'song_title': song.title, 'artist': song.artist or song.project.artist or song.project.owner_name,
         'project_id': song.project_id, 'cover_path': song.cover_path if song.cover_path is not None else song.project.cover_path, 'version_name': version.version_name,
         'lines': [{'text': line.text, 'start_time': line.start_time, 'end_time': line.end_time} for line in project.lines],
@@ -75,7 +75,8 @@ def validate_collection(data, db):
     if data.base_aesthetic not in RECIPES:
         raise HTTPException(422, 'Choose a built-in base aesthetic')
     for identifier in data.media_ids:
-        owned(db, ContentMedia, identifier)
+        if owned(db, ContentMedia, identifier).provider == 'placeholder':
+            raise HTTPException(422, 'Black screens cannot be added to collections.')
 
 
 @router.post('/aesthetics', status_code=201)
@@ -153,7 +154,7 @@ def projects(db: Database):
 def create(data: Create, db: Database):
     version = require_record(db, SongVersion, data.song_version_id)
     project = ContentProject(owner_id=db.info['owner_id'], song_id=version.song_id, song_version_id=version.id,
-                             title=data.title, end_time=min(15, duration(version)))
+                             title=data.title, output_format=data.output_format, end_time=min(15, duration(version)))
     db.add(project)
     db.commit()
     return view(project, db)
@@ -184,7 +185,7 @@ def edit(identifier: int, data: Edit, db: Database):
         project.lines.extend(ContentLyricLine(line_index=index, text=line) for index, line in enumerate(lines))
     if section_changed:
         project.clips.clear()
-    for key, value in data.model_dump().items():
+    for key, value in data.model_dump(exclude_none=True).items():
         setattr(project, key, value)
     changed(project)
     db.commit()
@@ -232,7 +233,7 @@ def search_media(data, db):
                 media = ContentMedia(owner_id=db.info['owner_id'], provider=data.provider, provider_id=value['provider_id'], metadata_json=value)
                 db.add(media)
                 db.flush()
-            items.append({'id': media.id, 'favorite': media.favorite, **media.metadata_json})
+            items.append({'id': media.id, 'folder_id': media.folder_id, 'favorite': media.favorite, **media.metadata_json})
             if len(items) >= data.count:
                 return items
     return items
@@ -249,7 +250,7 @@ def search(data: Search, db: Database):
 def favorites(db: Database, q: str = ''):
     if len(q) > 100:
         raise HTTPException(422, 'Search is too long')
-    return [{'id': item.id, 'favorite': item.favorite, **item.metadata_json} for item in db.scalars(select(ContentMedia).where(ContentMedia.owner_id == db.info['owner_id'], or_(ContentMedia.favorite.is_(True), ContentMedia.provider == 'upload')).order_by(ContentMedia.id.desc()))
+    return [{'id': item.id, 'folder_id': item.folder_id, 'favorite': item.favorite, **item.metadata_json} for item in db.scalars(select(ContentMedia).where(ContentMedia.owner_id == db.info['owner_id'], ContentMedia.provider != 'placeholder', or_(ContentMedia.favorite.is_(True), ContentMedia.provider == 'upload')).order_by(ContentMedia.id.desc()))
             if q.casefold() in f"{item.metadata_json.get('title', '')} {item.metadata_json.get('tags', '')}".casefold()]
 
 
@@ -328,10 +329,11 @@ def uploaded_poster(identifier: int, db: Database):
 
 @router.put('/media/{identifier}/details')
 def media_details(identifier: int, data: MediaDetails, db: Database):
+    lock_track_order(db)
     media = owned(db, ContentMedia, identifier)
     media.metadata_json = {**media.metadata_json, 'title': data.title.strip(), 'tags': data.tags.strip()}
     db.commit()
-    return {'id': media.id, 'favorite': media.favorite, **media.metadata_json}
+    return {'id': media.id, 'folder_id': media.folder_id, 'favorite': media.favorite, **media.metadata_json}
 
 
 @router.delete('/media/{identifier}', status_code=204)
@@ -340,38 +342,47 @@ def delete_uploaded_media(identifier: int, db: Database):
     media = owned(db, ContentMedia, identifier)
     if media.provider != 'upload':
         raise HTTPException(409, 'Only your uploaded clips can be deleted. Unsave stock footage instead.')
-    if db.scalar(select(ContentClip.id).where(ContentClip.media_id == identifier).limit(1)):
-        raise HTTPException(409, 'This clip is used in a Studio timeline. Remove it from those projects first.')
-    for project in db.scalars(select(ContentProject).where(ContentProject.owner_id == media.owner_id)):
-        if identifier in project.media_pool:
-            raise HTTPException(409, f'This clip is saved in the selection for “{project.title}”. Choose a new selection without this clip and regenerate that draft first.')
-    for collection in db.scalars(select(AestheticCollection).where(AestheticCollection.owner_id == media.owner_id)):
-        if identifier in collection.media_ids:
-            raise HTTPException(409, 'Remove this clip from its saved aesthetic collection first.')
-    for job in db.scalars(select(ContentRenderJob).where(ContentRenderJob.status.in_(['queued', 'rendering']))):
-        if any(clip.get('media_id') == identifier for clip in job.snapshot.get('clips', [])):
-            raise HTTPException(409, 'A pending render uses this clip. Wait for the render to finish.')
     import re
     if not re.fullmatch(r'[0-9a-f]{32}', media.provider_id):
         raise HTTPException(409, 'Unexpected upload location; nothing was deleted.')
     directory = content_path(f'library/{media.provider_id}')
     if media.metadata_json.get('local_path') != f'library/{media.provider_id}/video.mp4':
         raise HTTPException(409, 'Unexpected upload location; nothing was deleted.')
-    try:
-        if directory.exists():
-            shutil.rmtree(directory)
-    except OSError:
-        raise HTTPException(503, 'Could not remove the clip files. Please try again.') from None
+    placeholder = db.scalar(select(ContentMedia).where(ContentMedia.owner_id == media.owner_id, ContentMedia.provider == 'placeholder'))
+    if placeholder is None:
+        placeholder = ContentMedia(owner_id=media.owner_id, provider='placeholder', provider_id='black', favorite=False,
+            metadata_json={'provider':'placeholder', 'provider_id':'black', 'title':'Black screen', 'tags':'Deleted footage', 'duration':60, 'width':1080, 'height':1920, 'preview_url':'', 'video_url':'', 'source_url':''})
+        db.add(placeholder)
+        db.flush()
     for project in db.scalars(select(ContentProject).where(ContentProject.owner_id == media.owner_id)):
+        affected = identifier in project.media_pool or identifier in project.media_history
+        for clip in project.clips:
+            if clip.media_id == identifier:
+                clip.media = placeholder
+                clip.source_start = 0
+                clip.loop_source = True
+                clip.framing = {}
+                affected = True
+        project.media_pool = [value for value in project.media_pool if value != identifier]
         project.media_history = [value for value in project.media_history if value != identifier]
+        if affected:
+            changed(project)
+    for collection in db.scalars(select(AestheticCollection).where(AestheticCollection.owner_id == media.owner_id)):
+        collection.media_ids = [value for value in collection.media_ids if value != identifier]
+    db.add(MediaCleanup(media_id=identifier, directory=f'library/{media.provider_id}'))
+    db.flush()
     db.delete(media)
     db.commit()
+    from app.services.media_cleanup import cleanup_deleted_media
+    cleanup_deleted_media(db)
     return Response(status_code=204)
 
 
 @router.patch('/media/{identifier}')
 def favorite(identifier: int, data: Favorite, db: Database):
     media = owned(db, ContentMedia, identifier)
+    if media.provider == 'placeholder':
+        raise HTTPException(409, 'System black screens cannot be saved to the library.')
     media.favorite = data.favorite
     db.commit()
     return {'favorite': media.favorite}
@@ -385,7 +396,8 @@ def draft(identifier: int, data: Draft, db: Database):
     if data.mode == 'selected' or (data.mode == 'reroll' and project.media_pool):
         ids = list(dict.fromkeys(data.media_ids if data.mode == 'selected' else project.media_pool))
         for value in ids:
-            owned(db, ContentMedia, value)
+            if owned(db, ContentMedia, value).provider == 'placeholder':
+                raise HTTPException(422, 'Choose library footage for new drafts.')
         project.media_pool = ids.copy()
         old = {clip.media_id for clip in project.clips}
         fresh = [value for value in ids if value not in old]
@@ -622,7 +634,62 @@ def preview_lyric(identifier: int, data: LyricPreview, db: Database):
     owned(db, ContentProject, identifier)
     from app.services.studio_text_preview import lyric_png
     try:
-        image = lyric_png(data.text, data.style.model_dump(), data.preset)
+        image = lyric_png(data.text, data.style.model_dump(), data.preset, data.output_format)
     except (OSError, RuntimeError, subprocess.TimeoutExpired):
         raise HTTPException(503, 'Could not prepare lyric preview. Check the bundled Studio fonts.') from None
     return Response(image, media_type='image/png', headers={'Cache-Control': 'private, no-store'})
+
+
+@router.get('/folders')
+def folders(db: Database):
+    media = db.scalars(select(ContentMedia).where(ContentMedia.owner_id == db.info['owner_id'])).all()
+    return [{'id':f.id, 'name':f.name, 'count':sum(m.folder_id==f.id for m in media)} for f in db.scalars(select(MediaFolder).where(MediaFolder.owner_id==db.info['owner_id']).order_by(MediaFolder.name_key))]
+
+
+def save_folder(data, db, folder=None):
+    key = data.name.casefold()
+    duplicate = db.scalar(select(MediaFolder).where(MediaFolder.owner_id==db.info['owner_id'], MediaFolder.name_key==key))
+    if duplicate is not None and (folder is None or duplicate.id != folder.id):
+        raise HTTPException(409, 'A folder with this name already exists.')
+    if folder is None:
+        folder = MediaFolder(owner_id=db.info['owner_id'])
+        db.add(folder)
+    folder.name, folder.name_key = data.name, key
+    db.commit()
+    return {'id':folder.id, 'name':folder.name}
+
+
+@router.post('/folders', status_code=201)
+def create_folder(data: FolderInput, db: Database):
+    lock_track_order(db)
+    return save_folder(data, db)
+
+
+@router.put('/folders/{identifier}')
+def rename_folder(identifier: int, data: FolderInput, db: Database):
+    lock_track_order(db)
+    return save_folder(data, db, owned(db, MediaFolder, identifier))
+
+
+@router.delete('/folders/{identifier}', status_code=204)
+def delete_folder(identifier: int, db: Database):
+    lock_track_order(db)
+    folder = owned(db, MediaFolder, identifier)
+    if db.scalar(select(ContentMedia.id).where(ContentMedia.folder_id==identifier).limit(1)):
+        raise HTTPException(409, 'Move or delete the videos in this folder before deleting it.')
+    db.delete(folder)
+    db.commit()
+    return Response(status_code=204)
+
+
+@router.put('/media/{identifier}/folder')
+def move_media(identifier: int, data: FolderMove, db: Database):
+    lock_track_order(db)
+    media = owned(db, ContentMedia, identifier)
+    if media.provider != 'upload':
+        raise HTTPException(422, 'Only uploaded videos can be moved to folders.')
+    if data.folder_id is not None:
+        owned(db, MediaFolder, data.folder_id)
+    media.folder_id = data.folder_id
+    db.commit()
+    return {'id':media.id, 'folder_id':media.folder_id, 'favorite':media.favorite, **media.metadata_json}

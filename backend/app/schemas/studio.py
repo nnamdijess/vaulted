@@ -7,6 +7,7 @@ class Input(BaseModel):
 
 
 class Create(Input):
+    output_format: Literal['9:16', '4:3'] = '9:16'
     song_version_id: int = Field(gt=0)
     title: str = Field(min_length=1, max_length=200)
 
@@ -19,6 +20,7 @@ class Create(Input):
 
 
 class Edit(Input):
+    output_format: Literal['9:16', '4:3'] | None = None
     title: str = Field(min_length=1, max_length=200)
     start_time: float = Field(ge=0)
     end_time: float = Field(gt=0)
@@ -139,6 +141,7 @@ class Timeline(Input):
 
 
 class LyricPreview(Input):
+    output_format: Literal['9:16', '4:3'] = '9:16'
     text: str = Field(max_length=500)
     style: TextStyle
     preset: Literal['minimal', 'large', 'lower', 'highlight'] = 'minimal'
@@ -148,3 +151,20 @@ class EditorChanges(Input):
     revision: int = Field(gt=0)
     clips: list[TimelineClip] | None = Field(default=None, max_length=200)
     text_style: TextStyle | None = None
+
+
+class FolderInput(Input):
+    name: str = Field(min_length=1, max_length=80)
+
+    @field_validator('name')
+    @classmethod
+    def clean_name(cls, value):
+        import unicodedata
+        value = unicodedata.normalize('NFKC', value).strip()
+        if not value or len(value)>80 or any(unicodedata.category(c).startswith('C') for c in value):
+            raise ValueError('Use a folder name of 1-80 visible characters')
+        return value
+
+
+class FolderMove(Input):
+    folder_id: int | None = Field(default=None, gt=0)

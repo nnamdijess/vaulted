@@ -167,7 +167,7 @@ export function DraftTimeline({ project, clips, disabled, saving, onReplace, tex
           <button className="studio-clip-select" aria-pressed={i === (following ? previewIndex : index)} aria-label={`Select section ${i + 1}, ${timestamp(c.start_time)} to ${timestamp(c.end_time)}`}
             disabled={disabled} onPointerDown={e => begin(e, i, 'order')} onPointerMove={move} onPointerUp={finish} onPointerCancel={cancelGesture}
             onClick={event => { if (event.detail === 0) seek(c.start_time, i); }}
-            style={c.media.thumbnail ? { backgroundImage: `linear-gradient(#0004,#0009),url("${c.media.thumbnail}")` } : undefined}>
+            style={c.media.provider === 'placeholder' ? { background: '#000', color: '#fff' } : c.media.thumbnail ? { backgroundImage: `linear-gradient(#0004,#0009),url("${c.media.thumbnail}")` } : undefined}>
             <span>Section {i + 1}</span><small>{timestamp(clipLength(c))}</small>
           </button>
           <button className="studio-trim right" aria-label={`Trim end section ${i + 1}`} disabled={disabled} onPointerDown={e => begin(e, i, 'right')} onPointerMove={move} onPointerUp={finish} onPointerCancel={cancelGesture}>│</button>

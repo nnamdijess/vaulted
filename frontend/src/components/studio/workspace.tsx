@@ -11,6 +11,8 @@ import { RenderGallery } from './render-gallery';
 import { RecentProjects } from './recent-projects';
 import { StudioEditor } from './editor';
 import './studio.css';
+import { FormatSelector } from './format-selector';
+import { OutputFormat } from '@/lib/studio';
 import './studio-refresh.css';
 import { StudioIcon } from './studio-icon';
 
@@ -39,6 +41,7 @@ export function Cover({ project }: { project: { project_id: number; song_id?: nu
 }
 
 function SongPicker() {
+  const [format,setFormat] = useState<OutputFormat>('9:16');
   const router = useRouter();
   const [query, setQuery] = useState('');
   const [songs, setSongs] = useState<StudioSong[]>([]);
@@ -51,10 +54,10 @@ function SongPicker() {
   }, [query]);
   async function choose(song: StudioSong, version: number) {
     setBusy(true); setError('');
-    try { const project = await api<ContentProject>('/studio/projects', postJson({ song_version_id: version, title: `${song.title} — video` })); router.push(`/studio/${project.id}`); }
+    try { const project = await api<ContentProject>('/studio/projects', postJson({ song_version_id: version, output_format:format, title: `${song.title} — video` })); router.push(`/studio/${project.id}`); }
     catch (err) { setError(err instanceof Error ? err.message : 'Could not start draft'); setBusy(false); }
   }
-  return <><h1>Choose your song</h1><p>Use an existing version from your Library.</p><label>Find a song<input value={query} onChange={event => setQuery(event.target.value)} type="search" /></label>{error && <p role="alert">{error}</p>}
+  return <><h1>Choose your song</h1><FormatSelector value={format} onChange={setFormat} disabled={busy} /><p>Use an existing version from your Library.</p><label>Find a song<input value={query} onChange={event => setQuery(event.target.value)} type="search" /></label>{error && <p role="alert">{error}</p>}
     <div className="studio-song-list">{songs.map(song => <article key={song.id}><Cover project={song} /><div><h2>{song.title}</h2><p>{song.artist} · {song.project_name}</p><label>Version<select disabled={busy} defaultValue="" onChange={event => { if (event.target.value) void choose(song, Number(event.target.value)); }}><option value="">Choose version…</option>{song.versions.map((version, index) => <option key={version.id} value={version.id}>{version.name}{index === 0 ? ' (latest)' : ''}</option>)}</select></label></div></article>)}</div>{busy && <p role="status">Reading audio and creating draft…</p>}
   </>;
 }

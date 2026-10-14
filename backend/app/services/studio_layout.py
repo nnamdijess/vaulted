@@ -4,6 +4,8 @@ from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
 from app.services.studio_fonts import FONT_DIR, FONT_FILES
 
+from app.services.studio_format import canvas
+
 CANVAS = (1080, 1920)
 
 
@@ -40,13 +42,16 @@ class Word:
     width: float
 
 
-def layout(text, style, preset='minimal'):
+def layout(text, style, preset='minimal', output_format='9:16'):
+    cw, ch = canvas(output_format)
+    inset = ch / 12
+    usable = ch - 2 * inset
     text = style.get('line_breaks', {}).get(text, text).replace('\r', '')
     size = style.get('font_size') or (72 if preset == 'large' else 48)
-    width = style.get('text_width_px') or 1080 * style.get('text_width', 82) / 100
+    width = style.get('text_width_px') * cw / 1080 if style.get('text_width_px') else cw * style.get('text_width', 82) / 100
     margin = 88 if style.get('italic') else 24
-    width = min(width, 1080-2*margin)
-    left = margin + (1080-width-2*margin) * style.get('text_x', .5)
+    width = min(width, cw-2*margin)
+    left = margin + (cw-width-2*margin) * style.get('text_x', .5)
     tracking = style.get('tracking', 0)
     weight = style.get('font_weight') or (700 if style.get('bold') else 400)
     # Fit unusually tall blocks inside the canvas without clipping user text.
@@ -74,13 +79,13 @@ def layout(text, style, preset='minimal'):
         ascent, descent = font.getmetrics()
         line_height = max(ascent + descent, size * style.get('line_spacing', 1.2))
         height = len(rows) * line_height
-        if height <= 1600 or size <= 8:
+        if height <= usable or size <= 8:
             break
-        size = max(8, size * min(.9, 1600 / height))
+        size = max(8, size * min(.9, usable / height))
     position = style.get('position') or ('bottom' if preset == 'lower' else 'middle')
-    top = {'top': 160, 'middle': (1920-height)/2, 'bottom': 1760-height}[position]
+    top = {'top': inset, 'middle': (ch-height)/2, 'bottom': ch-inset-height}[position]
     if style.get('text_y') is not None:
-        top = 160 + (1600-height) * style['text_y']
+        top = inset + (usable-height) * style['text_y']
     result = []
     last_text_row = max((index for index, row in enumerate(rows) if row), default=0)
     for index, row in enumerate(rows):
@@ -96,14 +101,14 @@ def layout(text, style, preset='minimal'):
             words.append(Word(word, x, top+index*line_height+ascent, length))
             x += length+actual_gap
         result.append(words)
-    return {'canvas':CANVAS, 'font_file':filename, 'font_size':size, 'font_weight':weight,
+    return {'canvas':(cw, ch), 'font_file':filename, 'font_size':size, 'font_weight':weight,
             'tracking':tracking, 'region':{'x':left,'width':width}, 'line_height':line_height,
             'lines':[[asdict(word) for word in row] for row in result]}, font
 
 
-def raster(text, style, preset='minimal'):
-    model, font = layout(text, style, preset)
-    image = Image.new('RGBA', CANVAS)
+def raster(text, style, preset='minimal', output_format='9:16'):
+    model, font = layout(text, style, preset, output_format)
+    image = Image.new('RGBA', model['canvas'])
     draw = ImageDraw.Draw(image)
     color = style.get('color', '#FFFF80' if preset=='highlight' else '#FFFFFF')
     for row in model['lines']:
@@ -117,7 +122,7 @@ def raster(text, style, preset='minimal'):
                 draw.line((word['x'], y+3, word['x']+word['width'], y+3), fill=color, width=2)
     if style.get('italic'):
         # Shear the completed block around its center; all glyphs share one transform.
-        image = image.transform(CANVAS, Image.Transform.AFFINE, (1,.08,-.08*960,0,1,0), Image.Resampling.BICUBIC)
+        image = image.transform(model['canvas'], Image.Transform.AFFINE, (1,.08,-.08*model['canvas'][1]/2,0,1,0), Image.Resampling.BICUBIC)
     buffer = BytesIO()
     image.save(buffer, format='PNG')
     return buffer.getvalue()
@@ -127,7 +132,7 @@ def overlay_sequence(snapshot, directory):
     """VFR PNG concat stream: one image per cue/gap, no per-frame rasterization."""
     style = snapshot.get('text_style') or {}
     total = snapshot['end_time'] - snapshot['start_time']
-    blank = Image.new('RGBA', CANVAS)
+    blank = Image.new('RGBA', canvas(snapshot.get('output_format', '9:16')))
     blank.save(directory / 'blank.png')
     entries, cursor = [], 0.0
     for index, cue in enumerate(snapshot['lines']):
@@ -137,7 +142,7 @@ def overlay_sequence(snapshot, directory):
             entries.append(('blank.png', start-cursor))
         if end > start:
             name = f'lyric-{index}.png'
-            (directory / name).write_bytes(raster(cue['text'], style, snapshot['lyric_style']))
+            (directory / name).write_bytes(raster(cue['text'], style, snapshot['lyric_style'], snapshot.get('output_format', '9:16')))
             entries.append((name, end-start))
         cursor = end
     if cursor < total:

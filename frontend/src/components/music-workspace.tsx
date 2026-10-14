@@ -1,4 +1,6 @@
 "use client";
+import './music-library.css';
+import { LibraryCard } from './library-card';
 import { BrandMark } from "@/components/brand-mark";
 import { PlayerIcon } from "./player-icon";
 import { WorkspaceNav } from './workspace-nav';
@@ -34,6 +36,8 @@ function WorkspaceContent({ projectId, songId }: { projectId?: string; songId?: 
   const [notice, setNotice] = useState("");
   const [dialog, setDialog] = useState<"project" | "tracks" | null>(null);
   const [dialogError, setDialogError] = useState("");
+  const [navigation,setNavigation]=useState(false);
+  const [totalDuration,setTotalDuration]=useState<number|null>(null);
   const [revision, setRevision] = useState(0);
   const player = usePlayer();
   const router = useRouter();
@@ -60,6 +64,12 @@ function WorkspaceContent({ projectId, songId }: { projectId?: string; songId?: 
     return () => { active = false; };
   }, [projectId, songId, revision]);
 
+  useEffect(()=>{
+    let active=true;
+    if(!projectId)return;
+    Promise.all(songs.filter(song=>song.latest_version_id).map(song=>api<{duration:number}>(`/studio/versions/${song.latest_version_id}/metadata`))).then(values=>{if(active)setTotalDuration(values.reduce((sum,item)=>sum+item.duration,0));}).catch(()=>{if(active)setTotalDuration(null);});
+    return()=>{active=false;};
+  },[songs,projectId]);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
@@ -98,9 +108,9 @@ function WorkspaceContent({ projectId, songId }: { projectId?: string; songId?: 
     else player.playQueue(queue, queue.findIndex((track) => track.songId === item.id));
   }
 
-  return <main>
-    <header><Link href="/" className="brand"><BrandMark /></Link><AccountArea /></header>
-    <WorkspaceNav />
+  return <main className="music-library">
+    <header className="library-header"><button className="library-menu-toggle" aria-label="Navigation menu" aria-expanded={navigation} aria-controls="library-navigation" onClick={()=>setNavigation(value=>!value)}>☰</button><Link href="/projects" className="brand"><BrandMark /><span>{libraryName}</span></Link><AccountArea /></header>
+    <div id="library-navigation" className={`library-navigation ${navigation?'is-open':''}`}><WorkspaceNav /></div>
     <nav aria-label="Breadcrumb"><Link href="/projects">{libraryName}</Link>{project && <> / <Link href={`/projects/${project.id}`}>{project.name}</Link></>}{song && <> / <span>{song.title}</span></>}</nav>
     {error && <div className="error" role="alert">{error} <button onClick={() => { setError(""); setLoading(true); setRevision((value) => value + 1); }}>Retry</button></div>}
     {notice && <p className="notice" role="status">{notice}</p>}
@@ -120,9 +130,9 @@ function WorkspaceContent({ projectId, songId }: { projectId?: string; songId?: 
     </> : projectId ? project && <>
       <section className="album-header">
         <ProjectCover project={project} onClick={() => setProjectAction("Change cover")} />
-        <div><div className="project-heading"><p className="eyebrow">PROJECT</p><ProjectActions project={project} songs={songs} action={projectAction} setAction={setProjectAction} onChange={(updated) => { setProject(updated); player.updateProject(updated); }} /></div><h1>{project.name}</h1><p className="album-subtitle">{project.artist || libraryName} <span>· {songs.length} {songs.length === 1 ? "track" : "tracks"}</span></p>
+        <div><div className="project-heading"><p className="eyebrow">PROJECT</p><ProjectActions project={project} songs={songs} action={projectAction} setAction={setProjectAction} onChange={(updated) => { setProject(updated); player.updateProject(updated); }} /></div><h1>{project.name}</h1><p className="album-subtitle">{project.artist || libraryName} <span>· {songs.length} {songs.length === 1 ? "track" : "tracks"}{totalDuration!==null&&<> · {Math.floor(totalDuration/60)}m {Math.floor(totalDuration%60)}s</>}</span></p>
           {project.description && <p className="description">{project.description}</p>}
-          <div className="album-buttons"><button disabled={!queue.length} onClick={() => player.playQueue(queue)}><PlayerIcon name="play" /> Play All</button><button className="secondary" onClick={() => openDialog("tracks")}>＋ Add Tracks</button></div>
+          <div className="album-buttons"><button disabled={!queue.length} onClick={() => {if(player.current?.projectId===project.id)player.toggle();else player.playQueue(queue);}}><PlayerIcon name={player.current?.projectId===project.id&&player.playing?"pause":"play"} /> {player.current?.projectId===project.id&&player.playing?"Pause":"Play All"}</button><button className="secondary" onClick={() => openDialog("tracks")}>＋ Add Tracks</button></div>
         </div>
       </section>
       <OrderedTracks songs={songs} currentId={player.current?.songId} onReorder={async ordered => {
@@ -139,7 +149,7 @@ function WorkspaceContent({ projectId, songId }: { projectId?: string; songId?: 
       {!songs.length && <div className="empty"><h2>Start with the music.</h2><p>Add one or several recordings. Names come from your files; details can wait.</p><button className="secondary" onClick={() => openDialog("tracks")}>Add Tracks</button></div>}
     </> : <>
       <div className="section-heading"><div><p className="eyebrow">YOUR MUSIC, IN PROGRESS</p><h1>{libraryName}</h1></div><button onClick={() => openDialog("project")}>＋ New Project</button></div>
-      <div className="project-grid">{projects.map((item) => <Link className="project-tile" href={`/projects/${item.id}`} key={item.id}><ProjectCover project={item} /><h2>{item.name}</h2><p className="muted">{item.artist || libraryName}</p></Link>)}</div>
+      <div className="library-grid">{projects.map(item=><LibraryCard key={item.id} project={item} fallback={libraryName} onChange={updated=>setProjects(items=>items.map(value=>value.id===updated.id?updated:value))} onDeleted={()=>setProjects(items=>items.filter(value=>value.id!==item.id))}/>)}</div>
       {!projects.length && <p className="empty">Create a project, then add your recordings.</p>}
     </>}
     {dialog && <Modal title={dialog === "tracks" ? "Add Tracks" : "New Project"} onClose={() => setDialog(null)} busy={busy}>

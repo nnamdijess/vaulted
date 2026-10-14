@@ -1,4 +1,5 @@
 """Bounded FFmpeg pipeline. All paths and arguments originate on the server."""
+from app.services.studio_format import canvas
 import math
 import shutil
 import subprocess
@@ -75,6 +76,7 @@ def command(arguments, cwd, timeout=600):
 
 def render(job_id, snapshot, update_progress):
     project_id = snapshot['id']
+    cw, ch = canvas(snapshot.get('output_format', '9:16'))
     work = content_path(f'projects/{project_id}/temp/{job_id}')
     work.mkdir(parents=True, exist_ok=True)
     output_key = f'projects/{project_id}/renders/{job_id}.mp4'
@@ -85,6 +87,12 @@ def render(job_id, snapshot, update_progress):
         for index, clip in enumerate(snapshot['clips']):
             media = clip['media']
             stock = content_path(f"projects/{project_id}/stock/{clip['media_id']}.mp4")
+            if media.get('provider') == 'placeholder':
+                filename = f'clip-{index}.mp4'
+                command(['-f', 'lavfi', '-i', f'color=black:s={cw}x{ch}:r=30', '-t', ffmpeg_time(clip['end_time']-clip['start_time']), '-an', '-c:v', 'libx264', '-preset', 'veryfast', '-pix_fmt', 'yuv420p', '-threads', '2', filename], work)
+                files.append(f"file '{filename}'")
+                update_progress(int(70 * (index + 1) / len(snapshot['clips'])))
+                continue
             if media.get('provider') == 'upload':
                 stock = content_path(media['local_path'])
             elif not stock.is_file():
@@ -93,12 +101,14 @@ def render(job_id, snapshot, update_progress):
             treatment = ',hue=s=0' if snapshot.get('render_aesthetic', snapshot['aesthetic']) == 'black-white' else ''
             command(['-protocol_whitelist', 'file,pipe', *(['-stream_loop', '-1'] if clip.get('loop_source', True) else []), '-ss', ffmpeg_time(clip['source_start']), '-f', 'mov', '-i', str(stock),
                      '-t', ffmpeg_time(clip['end_time'] - clip['start_time']), '-an',
-                     '-vf', framing_filter(clip.get('framing') or {}) + f',setsar=1,fps=30{treatment}',
+                     '-vf', framing_filter(clip.get('framing') or {}, snapshot.get('output_format', '9:16')) + f',setsar=1,fps=30{treatment}',
                      '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-pix_fmt', 'yuv420p', '-threads', '2', filename], work)
             files.append(f"file '{filename}'")
             update_progress(int(70 * (index + 1) / len(snapshot['clips'])))
         (work / 'clips.txt').write_text('\n'.join(files), encoding='utf-8')
-        args = ['-protocol_whitelist', 'file,pipe', '-f', 'concat', '-safe', '1', '-i', 'clips.txt',
+        # Clips already share dimensions, SAR, pixel format and frame rate.
+        # Metadata changes must not reset the overlay and discard buffered lyric cues.
+        args = ['-reinit_filter', '0', '-protocol_whitelist', 'file,pipe', '-f', 'concat', '-safe', '1', '-i', 'clips.txt',
                 '-ss', ffmpeg_time(snapshot['start_time']), '-protocol_whitelist', 'file,pipe', '-i', str(audio_path(snapshot['audio_path']))]
         if snapshot['lines']:
             from app.services.studio_layout import overlay_sequence
@@ -118,13 +128,14 @@ def render(job_id, snapshot, update_progress):
         shutil.rmtree(work, ignore_errors=True)
 
 
-def framing_filter(frame):
+def framing_filter(frame, output_format='9:16'):
+    cw, ch = canvas(output_format)
     # Same normalized free-space coordinates as the browser's object-position.
     zoom = frame.get('zoom', 1)
     x, y = frame.get('x', 0.5), frame.get('y', 0.5)
     fit = frame.get('mode', 'fill') == 'fit'
     mode = 'decrease' if fit else 'increase'
-    width, height = round(1080 * zoom / 2) * 2, round(1920 * zoom / 2) * 2
+    width, height = round(cw * zoom / 2) * 2, round(ch * zoom / 2) * 2
     return (f'scale={width}:{height}:force_original_aspect_ratio={mode}:force_divisible_by=2,'
-            f"crop=w='min(iw,1080)':h='min(ih,1920)':x='(iw-ow)*{x}':y='(ih-oh)*{y}',"
-            f"pad=1080:1920:x='(ow-iw)*{x}':y='(oh-ih)*{y}':color=black")
+            f"crop=w='min(iw,{cw})':h='min(ih,{ch})':x='(iw-ow)*{x}':y='(ih-oh)*{y}',"
+            f"pad={cw}:{ch}:x='(ow-iw)*{x}':y='(oh-ih)*{y}':color=black")

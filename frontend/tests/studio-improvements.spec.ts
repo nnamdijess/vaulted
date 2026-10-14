@@ -88,13 +88,7 @@ test('mobile library deletion, preserved selection, editable rows and canonical 
   await expect(panel.getByLabel('Layout for lyric 1')).toHaveValue('she sucking\n\nout my\nsoul like a\ndemon');
   await page.getByRole('button',{name:'Review Media',exact:true}).click();
   await trash.click();
-  await dialog.getByRole('button',{name:'Delete clip permanently'}).click();
-  await expect(dialog.getByRole('alert')).toContainText('timeline');
-  await dialog.getByRole('button',{name:'Cancel',exact:true}).click();
-  // Only this test-created project is removed, releasing the fixture for deletion.
-  expect((await request.delete(url)).ok()).toBe(true);
-  await trash.click();
-  await dialog.getByRole('button',{name:'Delete clip permanently'}).click();
+  await dialog.getByRole('button',{name:'Delete and Replace'}).click();
   await expect(dialog).toHaveCount(0);
   await expect(page.locator('.studio-media-grid article')).toHaveCount(0);
   expect(readFileSync(file).length).toBeGreaterThan(0);

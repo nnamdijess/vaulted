@@ -41,11 +41,14 @@ class ImprovementsTest(unittest.TestCase):
         with self.sessions() as db:
             job = ContentRenderJob(content_project_id=self.project['id'], status='queued', snapshot={'revision':1,'clips':[{'media_id':identifier}]})
             db.add(job); db.commit(); job_id=job.id
-        self.assertEqual(self.client.delete(url).status_code, 409)
+        self.assertEqual(self.client.delete(url).status_code, 204)
+        self.assertTrue(folder.exists())
         with self.sessions() as db:
             db.get(ContentRenderJob, job_id).status='completed'; db.commit()
         (folder/'poster.jpg').unlink()
-        self.assertEqual(self.client.delete(url).status_code, 204)
+        from app.services.media_cleanup import cleanup_deleted_media
+        with self.sessions() as db:
+            cleanup_deleted_media(db)
         self.assertFalse(folder.exists())
         self.assertEqual(self.client.delete(url).status_code, 404)
 
@@ -53,7 +56,11 @@ class ImprovementsTest(unittest.TestCase):
         identifier, folder = self.media()
         draft = self.client.post(self.url+'/draft', json={'media_ids':[identifier]}).json()
         self.assertTrue(draft['clips'])
-        self.assertEqual(self.client.delete(f'/api/studio/media/{identifier}').status_code,409)
+        self.assertEqual(self.client.delete(f'/api/studio/media/{identifier}').status_code,204)
+        replacement = self.client.get(self.url).json()['clips'][0]
+        self.assertEqual(replacement['media']['provider'], 'placeholder')
+        self.assertEqual(replacement['end_time'], draft['clips'][0]['end_time'])
+        identifier, folder = self.media()
         self.client.delete(self.url+'/clips')
         with self.sessions() as db:
             media=db.get(ContentMedia,identifier);media.provider='pixabay';db.commit()
