@@ -34,6 +34,16 @@ class Timing(Input):
 
 
 class TextStyle(Input):
+    outline_enabled: bool = True
+    outline_color: str = Field(default='#101010', pattern=r'^#[0-9a-fA-F]{6}$')
+    outline_thickness: int = Field(default=1, ge=0, le=12)
+    shadow_enabled: bool = False
+    shadow_color: str = Field(default='#000000', pattern=r'^#[0-9a-fA-F]{6}$')
+    shadow_blur: float = Field(default=6, ge=0, le=30)
+    shadow_x: int = Field(default=4, ge=-40, le=40)
+    shadow_y: int = Field(default=4, ge=-40, le=40)
+    shadow_opacity: float = Field(default=0.6, ge=0, le=1)
+
     position: Literal['top', 'middle', 'bottom'] | None = None
     font_size: float | None = Field(default=None, ge=24, le=160)
     bold: bool = False
@@ -67,7 +77,7 @@ class TextStyle(Input):
     text_width_px: int | None = Field(default=None, ge=240, le=972)
     text_width: int = Field(default=82, ge=40, le=90)
     color: str = Field(pattern=r'^#[0-9a-fA-F]{6}$')
-    font: Literal['default', 'abel', 'anton', 'lobster', 'blackletter', 'mono', 'bebas', 'dela', 'bowlby', 'montserrat', 'playfair', 'oswald', 'unbounded', 'josefin', 'roboto_mono', 'space_grotesk', 'atkinson_next', 'barlow_condensed', 'archivo_narrow', 'teko', 'fjalla_one', 'saira_condensed', 'league_gothic', 'roboto_condensed']
+    font: Literal['helvetica_neue_cyr_light', 'helvetica_neue', 'arial_nova', 'default', 'abel', 'anton', 'lobster', 'blackletter', 'mono', 'bebas', 'dela', 'bowlby', 'montserrat', 'playfair', 'oswald', 'unbounded', 'josefin', 'roboto_mono', 'space_grotesk', 'atkinson_next', 'barlow_condensed', 'archivo_narrow', 'teko', 'fjalla_one', 'saira_condensed', 'league_gothic', 'roboto_condensed']
     align: Literal['left', 'center', 'right', 'justify']
 
 

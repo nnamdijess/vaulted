@@ -68,6 +68,20 @@ test('mobile library deletion, preserved selection, editable rows and canonical 
   const panel=page.getByRole('complementary',{name:'Text styling'});
   await panel.getByTestId('studio-font-group').locator('summary').click();
   await panel.getByRole('button',{name:'Oswald',exact:true}).click();
+  const fonts = await (await request.get(`${base}/studio/font-options`)).json();
+  for (const [key,name] of [['helvetica_neue','Helvetica Neue'],['arial_nova','Arial Nova'],['helvetica_neue_cyr_light','Helvetica Neue Cyr Light']]) {
+    const option = panel.getByRole('button',{name:fonts[key] ? name : `${name} · Not installed`,exact:true});
+    if(fonts[key]) await expect(option).toBeEnabled(); else await expect(option).toBeDisabled();
+  }
+  await panel.getByText('Outline & shadow',{exact:true}).click();
+  await panel.getByLabel('Outline thickness',{exact:true}).fill('5');
+  await panel.getByLabel('Outline color',{exact:true}).fill('#c42828');
+  await panel.getByLabel('Enable shadow',{exact:true}).check();
+  await panel.getByLabel('Shadow color',{exact:true}).fill('#126eff');
+  await panel.getByLabel('Shadow blur',{exact:true}).fill('9');
+  await panel.getByLabel('Shadow horizontal offset',{exact:true}).fill('-12');
+  await panel.getByLabel('Shadow vertical offset',{exact:true}).fill('18');
+  await panel.getByLabel('Shadow opacity',{exact:true}).fill('0.75');
   await panel.getByRole('button',{name:'Align justify',exact:true}).click();
   await panel.locator('summary').filter({hasText:'Size & spacing'}).click();
   await panel.getByLabel('Text width',{exact:true}).fill('500');
@@ -86,10 +100,19 @@ test('mobile library deletion, preserved selection, editable rows and canonical 
   await page.getByRole('button',{name:'4. Visuals',exact:true}).click();
   await panel.getByText('Edit lyric line breaks',{exact:true}).click();
   await expect(panel.getByLabel('Layout for lyric 1')).toHaveValue('she sucking\n\nout my\nsoul like a\ndemon');
+  await panel.getByText('Outline & shadow',{exact:true}).click();
+  await expect(panel.getByLabel('Outline thickness',{exact:true})).toHaveValue('5');
+  await expect(panel.getByLabel('Enable shadow',{exact:true})).toBeChecked();
+  await expect(panel.getByLabel('Shadow horizontal offset',{exact:true})).toHaveValue('-12');
+  await expect(panel.getByLabel('Shadow opacity',{exact:true})).toHaveValue('0.75');
   await page.getByRole('button',{name:'Review Media',exact:true}).click();
   await trash.click();
   await dialog.getByRole('button',{name:'Delete and Replace'}).click();
   await expect(dialog).toHaveCount(0);
   await expect(page.locator('.studio-media-grid article')).toHaveCount(0);
   expect(readFileSync(file).length).toBeGreaterThan(0);
+  await page.goto('/studio');
+  await expect(page.locator('.studio-card-open')).toHaveCount(0);
+  await page.locator('.studio-card').filter({hasText:'Typography'}).click();
+  await expect(page).toHaveURL(new RegExp(`/studio/${draft.id}$`));
 });

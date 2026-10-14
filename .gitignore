@@ -55,3 +55,6 @@ playwright-report/
 Thumbs.db
 .idea/
 .vscode/
+
+# User-provided Studio fonts
+/backend/app/assets/studio-fonts/private/

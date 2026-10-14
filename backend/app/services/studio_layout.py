@@ -1,8 +1,8 @@
 """Canonical pixel layout and rasterization for previews and MP4 overlays."""
 from dataclasses import dataclass, asdict
 from io import BytesIO
-from PIL import Image, ImageDraw, ImageFont
-from app.services.studio_fonts import FONT_DIR, FONT_FILES
+from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageColor
+from app.services.studio_fonts import FONT_DIR, FONT_FILES, OPTIONAL_FONTS
 
 from app.services.studio_format import canvas
 
@@ -15,6 +15,8 @@ def load_font(key, size, weight=400):
         labels = {100:'Thin',200:'ExtraLight',300:'Light',400:'Regular',500:'Medium',600:'SemiBold',700:'Bold',800:'ExtraBold',900:'Black'}
         name = name.split('-')[0] + '-' + labels[min(labels, key=lambda w: abs(w-weight))] + '.ttf'
     path = FONT_DIR / name
+    if key in OPTIONAL_FONTS and not path.is_file():
+        raise OSError(f'{OPTIONAL_FONTS[key]} is not installed on the server')
     if not path.is_file():
         path = FONT_DIR / 'Montserrat-Variable.ttf'
     font = ImageFont.truetype(str(path), max(8, round(size)))
@@ -23,7 +25,7 @@ def load_font(key, size, weight=400):
         font.set_variation_by_axes([min(axis['maximum'], max(axis['minimum'], weight)) if axis['name'] == b'Weight' else axis['default'] for axis in axes])
     except OSError:
         pass  # Static font: use its real, available weight.
-    return font, path.name
+    return font, str(path.relative_to(FONT_DIR))
 
 
 def measure(word, font, tracking):
@@ -44,12 +46,16 @@ class Word:
 
 def layout(text, style, preset='minimal', output_format='9:16'):
     cw, ch = canvas(output_format)
-    inset = ch / 12
+    outline = style.get('outline_thickness', 1) if style.get('outline_enabled', True) else 0
+    blur = style.get('shadow_blur', 6) * 3 if style.get('shadow_enabled') else 0
+    horizontal_effect = outline + blur + (abs(style.get('shadow_x', 4)) if style.get('shadow_enabled') else 0)
+    vertical_effect = outline + blur + (abs(style.get('shadow_y', 4)) if style.get('shadow_enabled') else 0)
+    inset = max(ch / 12, vertical_effect + 8)
     usable = ch - 2 * inset
     text = style.get('line_breaks', {}).get(text, text).replace('\r', '')
     size = style.get('font_size') or (72 if preset == 'large' else 48)
     width = style.get('text_width_px') * cw / 1080 if style.get('text_width_px') else cw * style.get('text_width', 82) / 100
-    margin = 88 if style.get('italic') else 24
+    margin = max(88 if style.get('italic') else 24, horizontal_effect + (72 if style.get('italic') else 8))
     width = min(width, cw-2*margin)
     left = margin + (cw-width-2*margin) * style.get('text_x', .5)
     tracking = style.get('tracking', 0)
@@ -116,13 +122,23 @@ def raster(text, style, preset='minimal', output_format='9:16'):
             x, y = word['x'], word['y']
             pieces = word['text'] if model['tracking'] else [word['text']]
             for piece in pieces:
-                draw.text((x, y), piece, font=font, anchor='ls', fill=color, stroke_width=1, stroke_fill='#101010')
+                draw.text((x, y), piece, font=font, anchor='ls', fill=color, stroke_width=style.get('outline_thickness', 1) if style.get('outline_enabled', True) else 0, stroke_fill=style.get('outline_color', '#101010'))
                 x += font.getlength(piece) + model['tracking']
             if style.get('underline'):
                 draw.line((word['x'], y+3, word['x']+word['width'], y+3), fill=color, width=2)
     if style.get('italic'):
         # Shear the completed block around its center; all glyphs share one transform.
         image = image.transform(model['canvas'], Image.Transform.AFFINE, (1,.08,-.08*model['canvas'][1]/2,0,1,0), Image.Resampling.BICUBIC)
+    if style.get('shadow_enabled', False):
+        alpha = image.getchannel('A')
+        alpha = alpha.filter(ImageFilter.GaussianBlur(style.get('shadow_blur', 6)))
+        opacity = style.get('shadow_opacity', .6)
+        alpha = alpha.point(lambda value: round(value * opacity))
+        shadow = Image.new('RGBA', model['canvas'], ImageColor.getrgb(style.get('shadow_color', '#000000')) + (0,))
+        shadow.putalpha(alpha)
+        shifted = Image.new('RGBA', model['canvas'])
+        shifted.paste(shadow, (style.get('shadow_x', 4), style.get('shadow_y', 4)))
+        image = Image.alpha_composite(shifted, image)
     buffer = BytesIO()
     image.save(buffer, format='PNG')
     return buffer.getvalue()

@@ -109,18 +109,30 @@ def presets(db: Database):
             'styles': [{'id': key, 'name': value} for key, value in STYLES.items()]}
 
 
+@router.get('/font-options')
+def font_options(db: Database):
+    from app.services.studio_fonts import OPTIONAL_FONTS, optional_font_available
+    return {key: optional_font_available(key) for key in OPTIONAL_FONTS}
+
+
 @router.get('/fonts/{font_id}')
 def font_file(font_id: str, db: Database, weight: int = 400):
     if font_id not in FONT_FILES:
         raise HTTPException(404, 'Font not found')
     from app.services.studio_layout import load_font
-    _, filename = load_font(font_id, 24, max(100, min(900, weight)))
-    return FileResponse(FONT_DIR / filename, media_type='font/ttf',
+    try:
+        _, filename = load_font(font_id, 24, max(100, min(900, weight)))
+    except OSError:
+        raise HTTPException(404, 'Font is not installed on this server') from None
+    return FileResponse(FONT_DIR / filename, media_type='font/otf' if filename.lower().endswith('.otf') else 'font/ttf',
                         headers={'Cache-Control': 'private, max-age=86400'})
 
 
 @router.put('/projects/{identifier}/text-style')
 def edit_text_style(identifier: int, data: TextStyle, db: Database):
+    from app.services.studio_fonts import OPTIONAL_FONTS, optional_font_available
+    if data.font in OPTIONAL_FONTS and not optional_font_available(data.font):
+        raise HTTPException(422, 'Install this font on the server before selecting it.')
     lock_track_order(db)
     project = owned(db, ContentProject, identifier)
     project.text_style = data.model_dump()

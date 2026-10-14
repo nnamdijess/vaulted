@@ -16,3 +16,17 @@ FONT_FILES.update({"roboto_mono": "RobotoMono-Variable.ttf", "space_grotesk": "S
 
 FONTS.update({'barlow_condensed':'Barlow Condensed','archivo_narrow':'Archivo Narrow','teko':'Teko','fjalla_one':'Fjalla One','saira_condensed':'Saira Condensed','league_gothic':'League Gothic','roboto_condensed':'Roboto Condensed'})
 FONT_FILES.update({'barlow_condensed':'BarlowCondensed-Regular.ttf','archivo_narrow':'ArchivoNarrow-Variable.ttf','teko':'Teko-Variable.ttf','fjalla_one':'FjallaOne-Regular.ttf','saira_condensed':'SairaCondensed-Regular.ttf','league_gothic':'LeagueGothic-Variable.ttf','roboto_condensed':'RobotoCondensed-Variable.ttf'})
+
+# Install user-supplied font files privately on each rendering server.
+OPTIONAL_FONTS = {'helvetica_neue_cyr_light': 'Helvetica Neue Cyr Light', 'helvetica_neue': 'Helvetica Neue', 'arial_nova': 'Arial Nova'}
+FONTS.update(OPTIONAL_FONTS)
+FONT_FILES.update({'helvetica_neue_cyr_light':'private/HelveticaNeueCyr-Light.otf', 'helvetica_neue':'private/HelveticaNeue.ttf', 'arial_nova':'private/ArialNova.ttf'})
+
+
+def optional_font_available(key):
+    from PIL import ImageFont
+    try:
+        ImageFont.truetype(str(FONT_DIR / FONT_FILES[key]), 24)
+        return True
+    except (OSError, KeyError):
+        return False

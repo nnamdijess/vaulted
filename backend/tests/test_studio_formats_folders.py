@@ -153,7 +153,9 @@ class FormatsFoldersTest(unittest.TestCase):
             self.assertEqual(changed['output_format'],fmt)
             self.assertEqual(changed['lines'],original['lines'])
             self.assertEqual(changed['clips'][0]['end_time'],3)
-            style={'font':'anton','font_size':64,'color':'#FFFFFF','align':'justify','text_y':.7}
+            style={'font':'anton','font_size':64,'color':'#FFFFFF','align':'justify','text_y':.7,
+                   'outline_enabled':True,'outline_color':'#FFCCCC','outline_thickness':4,
+                   'shadow_enabled':True,'shadow_color':'#CCCCFF','shadow_blur':3,'shadow_x':12,'shadow_y':10,'shadow_opacity':.8}
             saved=self.client.put(self.url+'/text-style',json=style).json()
             preview=self.client.post(self.url+'/lyric-preview',json={'text':'Visible lyrics','style':style,'output_format':fmt})
             self.assertEqual(Image.open(io.BytesIO(preview.content)).size,dimensions)
@@ -169,7 +171,8 @@ class FormatsFoldersTest(unittest.TestCase):
                 bounds=image.convert('L').point(lambda p:255 if p>100 else 0).getbbox()
                 if sec==.1:self.assertIsNone(bounds)
                 else:
-                    expected=Image.open(io.BytesIO(raster('Visible lyrics',saved['text_style'],'minimal',fmt))).convert('L').point(lambda p:255 if p>100 else 0).getbbox()
+                    overlay=Image.open(io.BytesIO(raster('Visible lyrics',saved['text_style'],'minimal',fmt)))
+                    expected=Image.alpha_composite(Image.new('RGBA',dimensions,'black'),overlay).convert('L').point(lambda p:255 if p>100 else 0).getbbox()
                     self.assertIsNotNone(bounds)
                     for a,b in zip(bounds,expected):self.assertLessEqual(abs(a-b),2)
             self.assertEqual(job['output_format'],fmt)

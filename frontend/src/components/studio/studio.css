@@ -251,3 +251,8 @@
 .studio-heading .button, .studio-actions > button {display:inline-flex;align-items:center;justify-content:center;gap:6px;}
 
 .studio-draft-preview { scroll-margin-top: calc(env(safe-area-inset-top, 0px) + 24px); }
+
+@font-face {font-family:'Vaulted Helvetica Neue';src:url('/api/studio/fonts/helvetica_neue');font-weight:400;font-display:swap;}
+@font-face {font-family:'Vaulted Arial Nova';src:url('/api/studio/fonts/arial_nova');font-weight:400;font-display:swap;}
+
+@font-face {font-family:'Vaulted Helvetica Neue Cyr Light';src:url('/api/studio/fonts/helvetica_neue_cyr_light') format('opentype');font-weight:300;font-display:swap;}

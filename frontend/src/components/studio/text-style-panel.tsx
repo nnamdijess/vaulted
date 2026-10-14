@@ -1,11 +1,15 @@
 "use client";
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { TextStyle, studioFonts, lyricCss, fontWeights } from '@/lib/studio-text-style';
+import { api } from '@/lib/api';
+import { TextEffects } from './text-effects';
 import { OutputFormat, outputDimensions } from '@/lib/studio';
 
 export function TextStylePanel({ value, onChange, disabled, lyrics = [], outputFormat = '9:16' }: {
   lyrics?: string[]; value: TextStyle; onChange: (value: TextStyle) => void; disabled: boolean; outputFormat?: OutputFormat;
 }) {
+  const [available, setAvailable] = useState<Record<string, boolean>>({helvetica_neue_cyr_light:false, helvetica_neue:false, arial_nova:false});
+  useEffect(() => { let active = true; api<Record<string, boolean>>('/studio/font-options').then(value => {if(active)setAvailable(value);}).catch(() => {}); return () => { active = false; }; }, []);
   const widthScale = outputDimensions(outputFormat)[0] / 1080;
   const [fontQuery, setFontQuery] = useState('');
   const fontName = value.font === 'default' ? 'Default' : studioFonts[value.font].replace('Vaulted ', '');
@@ -21,8 +25,9 @@ export function TextStylePanel({ value, onChange, disabled, lyrics = [], outputF
     <details className="studio-inspector-group" data-testid="studio-font-group"><summary><span>Font</span><small>{fontName}</small></summary>
     <fieldset disabled={disabled}><legend className="sr-only">Font</legend><label>Find a font<input type="search" value={fontQuery} onChange={event => setFontQuery(event.target.value)} placeholder="Search fonts…" /></label>{!visibleFonts.length && <p role="status">No fonts match your search.</p>}{[true, false].filter(narrow => visibleFonts.some(([font]) => condensed.includes(font) === narrow)).map(narrow => <div key={String(narrow)}><h4>{narrow ? 'Condensed & display' : 'More fonts'}</h4><div className="studio-font-options">
       {visibleFonts.filter(([font]) => condensed.includes(font) === narrow).map(([font, family]) => <button type="button" className="secondary" key={font} style={{ fontFamily: family }}
-        aria-pressed={value.font === font} onClick={() => onChange({ ...value, font: font as TextStyle['font'], font_weight: fontWeights(font as TextStyle['font']).reduce((best, weight) => Math.abs(weight-(value.font_weight ?? 400)) < Math.abs(best-(value.font_weight ?? 400)) ? weight : best) })}>{font === 'default' ? 'Default' : family.replace('Vaulted ', '')}</button>)}
+        disabled={available[font] === false} title={available[font] === false ? "Not installed on the server" : undefined} aria-pressed={value.font === font} onClick={() => onChange({ ...value, font: font as TextStyle['font'], font_weight: fontWeights(font as TextStyle['font']).reduce((best, weight) => Math.abs(weight-(value.font_weight ?? 400)) < Math.abs(best-(value.font_weight ?? 400)) ? weight : best) })}>{font === 'default' ? 'Default' : family.replace('Vaulted ', '')}{available[font] === false && <small> · Not installed</small>}</button>)}
     </div></div>)}</fieldset></details>
+    <TextEffects value={value} onChange={onChange} disabled={disabled} />
     <details className="studio-inspector-group" open><summary><span>Position & alignment</span><small>{value.align}</small></summary>
     <fieldset disabled={disabled}><legend>Lyric position</legend>
       <label>Vertical position<input aria-label="Lyric vertical position" type="range" min="0" max="1" step="0.005" value={value.text_y ?? (value.position === 'top' ? 0 : value.position === 'bottom' ? 1 : .5)} onChange={e => onChange({...value, text_y:Number(e.target.value)})} /></label>
@@ -44,13 +49,13 @@ export function TextStylePanel({ value, onChange, disabled, lyrics = [], outputF
     </fieldset>
     <fieldset disabled={disabled}><legend>Font Size</legend>
       <label>Font Size: {value.font_size ?? 48}px<input aria-label="Font Size" type="range" min="24" max="160" step="1" value={value.font_size ?? 48} onChange={event => onChange({ ...value, font_size: Number(event.target.value) })} /></label>
-      <small>Pixels in the 1080 × 1920 export.</small>
+      <small>Pixels in the selected export format.</small>
     </fieldset>
     <fieldset disabled={disabled}><legend>Spacing</legend>
       <label>Word spacing: {value.word_spacing ?? 0}px<input aria-label="Word spacing" type="range" min="0" max="160" step="1" value={value.word_spacing ?? 0} onChange={event => onChange({ ...value, letter_spacing: 0, word_spacing: Number(event.target.value) })} /></label>
       <label>Line spacing: {(value.line_spacing ?? 1.2).toFixed(1)}×<input aria-label="Line spacing" type="range" min="1" max="2.5" step="0.1" value={value.line_spacing ?? 1.2} onChange={event => onChange({ ...value, line_spacing: Number(event.target.value) })} /></label>
       <label>Text width: {Math.round((value.text_width_px ?? (value.text_width ?? 82) * 10.8) * widthScale)}px<input aria-label="Text width" type="range" min={Math.round(240 * widthScale)} max={Math.round(972 * widthScale)} step="1" value={Math.round((value.text_width_px ?? (value.text_width ?? 82) * 10.8) * widthScale)} onChange={event => onChange({ ...value, text_width_px: Math.round(Number(event.target.value) / widthScale) })} /></label>
-      <small>Pixels in the 1080 × 1920 export. Narrow the box to wrap words onto shorter lines.</small>
+      <small>Pixels in the selected export format. Narrow the box to wrap words onto shorter lines.</small>
     </fieldset>
     </details>
     {!!lyrics.length && <details className="studio-inspector-group"><summary>Edit lyric line breaks</summary><p>Keep the words unchanged. Enter adds a row inside the same timed lyric; blank rows add space.</p>{lyrics.map((text,index) => <label key={index}>Lyric {index+1}<textarea aria-label={`Layout for lyric ${index+1}`} value={value.line_breaks?.[text] ?? text} disabled={disabled} maxLength={1000} onChange={e => onChange({...value, line_breaks:{...value.line_breaks,[text]:e.target.value}})} /></label>)}</details>}
