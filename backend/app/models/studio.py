@@ -48,6 +48,7 @@ class ContentMedia(Base):
     provider: Mapped[str] = mapped_column(String(30), default='pixabay')
     provider_id: Mapped[str] = mapped_column(String(80))
     metadata_json: Mapped[dict] = mapped_column(JSON)
+    vault_id: Mapped[int | None] = mapped_column(ForeignKey('video_vaults.id'), index=True)
     folder_id: Mapped[int | None] = mapped_column(ForeignKey('media_folders.id'), index=True)
     favorite: Mapped[bool] = mapped_column(default=False)
 
@@ -95,6 +96,7 @@ class MediaFolder(Base):
     owner_id: Mapped[int] = mapped_column(ForeignKey('users.id'), index=True)
     name: Mapped[str] = mapped_column(String(80))
     name_key: Mapped[str] = mapped_column(String(160))
+    vault_id: Mapped[int | None] = mapped_column(ForeignKey('video_vaults.id'), index=True)
 
 
 class MediaCleanup(Base):
@@ -105,3 +107,28 @@ class MediaCleanup(Base):
     directory: Mapped[str] = mapped_column(String(255), unique=True)
     attempts: Mapped[int] = mapped_column(default=0)
     error: Mapped[str | None] = mapped_column(String(200))
+
+
+class VideoVault(Base):
+    __tablename__ = 'video_vaults'
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey('users.id'), unique=True)
+    name: Mapped[str] = mapped_column(String(80), default='Video Vault')
+
+
+class VaultMember(Base):
+    __tablename__ = 'vault_members'
+    id: Mapped[int] = mapped_column(primary_key=True)
+    vault_id: Mapped[int] = mapped_column(ForeignKey('video_vaults.id'), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey('users.id'), unique=True)
+
+
+class VaultInvite(Base):
+    __tablename__ = 'vault_invites'
+    id: Mapped[int] = mapped_column(primary_key=True)
+    vault_id: Mapped[int] = mapped_column(ForeignKey('video_vaults.id'), index=True)
+    email: Mapped[str] = mapped_column(String(320))
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    used: Mapped[bool] = mapped_column(default=False)
+    revoked: Mapped[bool] = mapped_column(default=False)

@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     cookie_secure: bool = False
     session_days: int = Field(default=7, ge=1, le=30)
     registration_enabled: bool = True
+    video_vault_admin_email: str = "itsfadajesse@gmail.com"
 
     database_url: str = f"sqlite:///{(BACKEND_ROOT / 'music.db').as_posix()}"
     uploads_dir: Path = REPOSITORY_ROOT / "uploads"

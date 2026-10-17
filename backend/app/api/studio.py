@@ -14,11 +14,14 @@ from app.services.studio_storage import duration, content_path
 from app.services.visual_provider import PixabayProvider, PexelsProvider
 from app.services.video_upload import ingest_video
 from app.schemas.studio import MediaDetails
+from app.services.video_vault import current_vault, visible_scope, media_access, can_manage, media_view
 
 router = APIRouter(prefix='/studio', tags=['studio'])
 
 
 def owned(db, model, identifier):
+    if model is ContentMedia:
+        return media_access(db, identifier)
     item = db.get(model, identifier)
     if item is None or item.owner_id != db.info['owner_id']:
         raise HTTPException(404, 'Studio item not found')
@@ -61,7 +64,7 @@ def collection_for(db, aesthetic):
 
 
 def collection_view(item, db):
-    media = [owned(db, ContentMedia, identifier) for identifier in item.media_ids]
+    media = db.scalars(select(ContentMedia).where(ContentMedia.id.in_(item.media_ids), visible_scope(db, ContentMedia))).all()
     return {'id': item.id, 'name': item.name, 'base_aesthetic': item.base_aesthetic, 'keywords': item.keywords,
             'media_ids': item.media_ids, 'media': [{'id': m.id, 'favorite': m.favorite, **m.metadata_json} for m in media]}
 
@@ -262,7 +265,7 @@ def search(data: Search, db: Database):
 def favorites(db: Database, q: str = ''):
     if len(q) > 100:
         raise HTTPException(422, 'Search is too long')
-    return [{'id': item.id, 'folder_id': item.folder_id, 'favorite': item.favorite, **item.metadata_json} for item in db.scalars(select(ContentMedia).where(ContentMedia.owner_id == db.info['owner_id'], ContentMedia.provider != 'placeholder', or_(ContentMedia.favorite.is_(True), ContentMedia.provider == 'upload')).order_by(ContentMedia.id.desc()))
+    return [media_view(db, item) for item in db.scalars(select(ContentMedia).where(visible_scope(db, ContentMedia), ContentMedia.provider != 'placeholder', or_(ContentMedia.favorite.is_(True), ContentMedia.provider == 'upload')).order_by(ContentMedia.id.desc()))
             if q.casefold() in f"{item.metadata_json.get('title', '')} {item.metadata_json.get('tags', '')}".casefold()]
 
 
@@ -289,22 +292,23 @@ def upload_media(db: Database, file: UploadFile):
         existing = source_match(db, source_hash)
         db.commit()
         if existing is not None:
-            return {'id': existing.id, 'favorite': existing.favorite, **existing.metadata_json, 'duplicate': True}
+            return {**media_view(db, existing), 'duplicate': True}
         identifier, metadata = ingest_video(file)
         lock_track_order(db)
         existing = find_match(db, metadata)
         if existing is not None:
             db.commit()
             shutil.rmtree(content_path(f'library/{identifier}'), ignore_errors=True)
-            return {'id': existing.id, 'favorite': existing.favorite, **existing.metadata_json, 'duplicate': True}
-        media = ContentMedia(owner_id=db.info['owner_id'], provider='upload', provider_id=identifier,
+            return {**media_view(db, existing), 'duplicate': True}
+        vault = current_vault(db)
+        media = ContentMedia(owner_id=db.info['owner_id'], vault_id=vault.id if vault else None, provider='upload', provider_id=identifier,
                              metadata_json=metadata, favorite=True)
         db.add(media)
         db.flush()
         url = f'/api/studio/media/{media.id}'
         media.metadata_json = {**metadata, 'preview_url': url + '/video', 'video_url': url + '/video', 'thumbnail': url + '/poster'}
         db.commit()
-        return {'id': media.id, 'favorite': True, **media.metadata_json}
+        return media_view(db, media)
     except Exception:
         db.rollback()
         if identifier is not None:
@@ -316,7 +320,7 @@ def upload_media(db: Database, file: UploadFile):
 
 @router.get('/media/{identifier}/video')
 def uploaded_video(identifier: int, db: Database):
-    media = owned(db, ContentMedia, identifier)
+    media = media_access(db, identifier, stream=True)
     if media.provider != 'upload':
         raise HTTPException(404, 'Upload not found')
     path = content_path(media.metadata_json['local_path'])
@@ -329,7 +333,7 @@ def uploaded_video(identifier: int, db: Database):
 
 @router.get('/media/{identifier}/poster')
 def uploaded_poster(identifier: int, db: Database):
-    media = owned(db, ContentMedia, identifier)
+    media = media_access(db, identifier, stream=True)
     if media.provider != 'upload':
         raise HTTPException(404, 'Upload not found')
     path = content_path(media.metadata_json['local_path']).with_name('poster.jpg')
@@ -343,9 +347,11 @@ def uploaded_poster(identifier: int, db: Database):
 def media_details(identifier: int, data: MediaDetails, db: Database):
     lock_track_order(db)
     media = owned(db, ContentMedia, identifier)
+    if not can_manage(db, media):
+        raise HTTPException(403, 'Only the uploader or vault owner can organize this clip.')
     media.metadata_json = {**media.metadata_json, 'title': data.title.strip(), 'tags': data.tags.strip()}
     db.commit()
-    return {'id': media.id, 'folder_id': media.folder_id, 'favorite': media.favorite, **media.metadata_json}
+    return media_view(db, media)
 
 
 @router.delete('/media/{identifier}', status_code=204)
@@ -357,29 +363,32 @@ def delete_uploaded_media(identifier: int, db: Database):
     import re
     if not re.fullmatch(r'[0-9a-f]{32}', media.provider_id):
         raise HTTPException(409, 'Unexpected upload location; nothing was deleted.')
+    if not can_manage(db, media, delete=True):
+        raise HTTPException(403, 'Only the vault owner can delete shared footage.')
     directory = content_path(f'library/{media.provider_id}')
     if media.metadata_json.get('local_path') != f'library/{media.provider_id}/video.mp4':
         raise HTTPException(409, 'Unexpected upload location; nothing was deleted.')
-    placeholder = db.scalar(select(ContentMedia).where(ContentMedia.owner_id == media.owner_id, ContentMedia.provider == 'placeholder'))
-    if placeholder is None:
-        placeholder = ContentMedia(owner_id=media.owner_id, provider='placeholder', provider_id='black', favorite=False,
-            metadata_json={'provider':'placeholder', 'provider_id':'black', 'title':'Black screen', 'tags':'Deleted footage', 'duration':60, 'width':1080, 'height':1920, 'preview_url':'', 'video_url':'', 'source_url':''})
-        db.add(placeholder)
-        db.flush()
-    for project in db.scalars(select(ContentProject).where(ContentProject.owner_id == media.owner_id)):
+    for project in db.scalars(select(ContentProject)):
         affected = identifier in project.media_pool or identifier in project.media_history
-        for clip in project.clips:
-            if clip.media_id == identifier:
+        matches = [clip for clip in project.clips if clip.media_id == identifier]
+        if matches:
+            placeholder = db.scalar(select(ContentMedia).where(ContentMedia.owner_id == project.owner_id, ContentMedia.provider == 'placeholder'))
+            if placeholder is None:
+                placeholder = ContentMedia(owner_id=project.owner_id, provider='placeholder', provider_id='black', favorite=False,
+                    metadata_json={'provider':'placeholder','provider_id':'black','title':'Black screen','tags':'Deleted footage','duration':60,'width':1080,'height':1920,'preview_url':'','video_url':'','source_url':''})
+                db.add(placeholder)
+                db.flush()
+            for clip in matches:
                 clip.media = placeholder
                 clip.source_start = 0
                 clip.loop_source = True
                 clip.framing = {}
-                affected = True
+            affected = True
         project.media_pool = [value for value in project.media_pool if value != identifier]
         project.media_history = [value for value in project.media_history if value != identifier]
         if affected:
             changed(project)
-    for collection in db.scalars(select(AestheticCollection).where(AestheticCollection.owner_id == media.owner_id)):
+    for collection in db.scalars(select(AestheticCollection)):
         collection.media_ids = [value for value in collection.media_ids if value != identifier]
     db.add(MediaCleanup(media_id=identifier, directory=f'library/{media.provider_id}'))
     db.flush()
@@ -392,9 +401,12 @@ def delete_uploaded_media(identifier: int, db: Database):
 
 @router.patch('/media/{identifier}')
 def favorite(identifier: int, data: Favorite, db: Database):
+    lock_track_order(db)
     media = owned(db, ContentMedia, identifier)
     if media.provider == 'placeholder':
         raise HTTPException(409, 'System black screens cannot be saved to the library.')
+    if media.vault_id is not None:
+        raise HTTPException(409, 'Shared uploads remain available to all vault members.')
     media.favorite = data.favorite
     db.commit()
     return {'favorite': media.favorite}
@@ -502,7 +514,7 @@ def apply_timeline(project, clips, db):
     if sum(item.duration for item in clips) > length + 0.02:
         raise HTTPException(422, 'Timeline exceeds the song section.')
     for item in clips:
-        media = owned(db, ContentMedia, item.media_id)
+        media = media_access(db, item.media_id, retained_project=project.id)
         available = media.metadata_json['duration'] - item.source_start
         if available <= 0:
             raise HTTPException(422, 'Source start must be within the original clip.')
@@ -652,23 +664,36 @@ def preview_lyric(identifier: int, data: LyricPreview, db: Database):
     return Response(image, media_type='image/png', headers={'Cache-Control': 'private, no-store'})
 
 
+def accessible_folder(db, identifier):
+    folder = db.scalar(select(MediaFolder).where(MediaFolder.id == identifier, visible_scope(db, MediaFolder)))
+    if not folder:
+        raise HTTPException(404, 'Folder not found')
+    return folder
+
+
 @router.get('/folders')
 def folders(db: Database):
-    media = db.scalars(select(ContentMedia).where(ContentMedia.owner_id == db.info['owner_id'])).all()
-    return [{'id':f.id, 'name':f.name, 'count':sum(m.folder_id==f.id for m in media)} for f in db.scalars(select(MediaFolder).where(MediaFolder.owner_id==db.info['owner_id']).order_by(MediaFolder.name_key))]
+    media = db.scalars(select(ContentMedia).where(visible_scope(db, ContentMedia))).all()
+    return [{'id':f.id,'name':f.name,'count':sum(m.folder_id==f.id for m in media),
+             'can_manage':can_manage(db,f,delete=True),'vault_id':f.vault_id}
+            for f in db.scalars(select(MediaFolder).where(visible_scope(db, MediaFolder)).order_by(MediaFolder.name_key))]
 
 
 def save_folder(data, db, folder=None):
+    vault = current_vault(db)
     key = data.name.casefold()
-    duplicate = db.scalar(select(MediaFolder).where(MediaFolder.owner_id==db.info['owner_id'], MediaFolder.name_key==key))
+    vault_id = folder.vault_id if folder is not None else (vault.id if vault else None)
+    scope = (MediaFolder.vault_id == vault_id) if vault_id is not None else ((MediaFolder.owner_id == db.info['owner_id']) & MediaFolder.vault_id.is_(None))
+    duplicate = db.scalar(select(MediaFolder).where(scope, MediaFolder.name_key == key))
     if duplicate is not None and (folder is None or duplicate.id != folder.id):
         raise HTTPException(409, 'A folder with this name already exists.')
     if folder is None:
-        folder = MediaFolder(owner_id=db.info['owner_id'])
+        # Keep the legacy owner/name uniqueness constraint valid across contributors.
+        folder = MediaFolder(owner_id=vault.owner_id if vault else db.info['owner_id'], vault_id=vault.id if vault else None)
         db.add(folder)
     folder.name, folder.name_key = data.name, key
     db.commit()
-    return {'id':folder.id, 'name':folder.name}
+    return {'id':folder.id,'name':folder.name}
 
 
 @router.post('/folders', status_code=201)
@@ -680,13 +705,18 @@ def create_folder(data: FolderInput, db: Database):
 @router.put('/folders/{identifier}')
 def rename_folder(identifier: int, data: FolderInput, db: Database):
     lock_track_order(db)
-    return save_folder(data, db, owned(db, MediaFolder, identifier))
+    folder = accessible_folder(db, identifier)
+    if not can_manage(db, folder, delete=True):
+        raise HTTPException(403, 'Only the vault owner can rename shared folders.')
+    return save_folder(data, db, folder)
 
 
 @router.delete('/folders/{identifier}', status_code=204)
 def delete_folder(identifier: int, db: Database):
     lock_track_order(db)
-    folder = owned(db, MediaFolder, identifier)
+    folder = accessible_folder(db, identifier)
+    if not can_manage(db, folder, delete=True):
+        raise HTTPException(403, 'Only the vault owner can delete shared folders.')
     if db.scalar(select(ContentMedia.id).where(ContentMedia.folder_id==identifier).limit(1)):
         raise HTTPException(409, 'Move or delete the videos in this folder before deleting it.')
     db.delete(folder)
@@ -700,8 +730,12 @@ def move_media(identifier: int, data: FolderMove, db: Database):
     media = owned(db, ContentMedia, identifier)
     if media.provider != 'upload':
         raise HTTPException(422, 'Only uploaded videos can be moved to folders.')
+    if not can_manage(db, media):
+        raise HTTPException(403, 'Only the uploader or vault owner can organize this clip.')
     if data.folder_id is not None:
-        owned(db, MediaFolder, data.folder_id)
+        folder = accessible_folder(db, data.folder_id)
+        if folder.vault_id != media.vault_id:
+            raise HTTPException(422, 'Private and shared clips use separate folders.')
     media.folder_id = data.folder_id
     db.commit()
-    return {'id':media.id, 'folder_id':media.folder_id, 'favorite':media.favorite, **media.metadata_json}
+    return media_view(db, media)

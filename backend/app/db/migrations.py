@@ -8,6 +8,10 @@ def upgrade_local_database(engine: Engine) -> None:
     with engine.begin() as connection:
         # Serialize startup upgrades when multiple local workers start together.
         connection.exec_driver_sql("BEGIN IMMEDIATE")
+        for table in ('content_media', 'media_folders'):
+            if inspect(connection).has_table(table) and 'vault_id' not in {c['name'] for c in inspect(connection).get_columns(table)}:
+                connection.exec_driver_sql(f'ALTER TABLE {table} ADD COLUMN vault_id INTEGER REFERENCES video_vaults(id)')
+                connection.exec_driver_sql(f'CREATE INDEX IF NOT EXISTS ix_{table}_vault_id ON {table}(vault_id)')
         if inspect(connection).has_table('content_media'):
             columns = {c['name'] for c in inspect(connection).get_columns('content_media')}
             if 'folder_id' not in columns:

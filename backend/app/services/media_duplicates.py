@@ -1,4 +1,4 @@
-"""Exact-content matching within one user's private uploaded library."""
+"""Exact-content matching within the user's accessible footage library."""
 import hashlib
 import re
 from pathlib import Path
@@ -7,6 +7,7 @@ from sqlalchemy import select
 from app.core.config import settings
 from app.models.studio import ContentMedia
 from app.services.studio_storage import content_path
+from app.services.video_vault import visible_scope, media_view
 
 
 def digest(path):
@@ -23,7 +24,7 @@ def uploaded_path(media):
 
 
 def uploads(db):
-    return db.scalars(select(ContentMedia).where(ContentMedia.owner_id == db.info['owner_id'], ContentMedia.provider == 'upload').order_by(ContentMedia.id)).all()
+    return db.scalars(select(ContentMedia).where(visible_scope(db, ContentMedia), ContentMedia.provider == 'upload').order_by(ContentMedia.id)).all()
 
 
 def upload_digest(upload):
@@ -83,7 +84,7 @@ def duplicate_copies(db):
             continue
         value = stored_digest(media, path)
         if value in seen:
-            copies.append({'id': media.id, 'favorite': media.favorite, **media.metadata_json, 'duplicate_of': seen[value]})
+            copies.append({**media_view(db, media), 'duplicate_of': seen[value]})
         else:
             seen[value] = media.id
     return copies

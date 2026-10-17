@@ -5,7 +5,7 @@ import { Media } from '@/lib/studio';
 
 type Runner = (work: () => Promise<void>) => Promise<void>;
 
-export function ClipLibraryTools({ disabled, run, onResults, mode = 'upload' }: { mode?: 'upload' | 'library'; disabled: boolean; run: Runner; onResults: (items: Media[]) => void }) {
+export function ClipLibraryTools({ disabled, run, onResults, mode = 'upload', shared = false }: { shared?: boolean; mode?: 'upload' | 'library'; disabled: boolean; run: Runner; onResults: (items: Media[]) => void }) {
   const [files, setFiles] = useState<File[]>([]);
   const picker = useRef<HTMLInputElement>(null);
   const [failures, setFailures] = useState<{ name: string; message: string }[]>([]);
@@ -53,7 +53,7 @@ export function ClipLibraryTools({ disabled, run, onResults, mode = 'upload' }: 
       }
     }); }}>
       <label>Video files<input ref={picker} type="file" multiple accept=".mp4,.mov,.m4v,.webm,.gif" disabled={disabled || uploading} onChange={event => { setFiles(Array.from(event.target.files || [])); setStatus(''); setFailures([]); setDuplicates([]); }} /></label>
-      <p>MP4, MOV, M4V, WebM or animated GIF. GIFs become MP4 clips using one animation cycle. Up to 250 MiB and 10 minutes per clip. Videos are copied into your private library and prepared without audio for Studio.</p>
+      <p>MP4, MOV, M4V, WebM or animated GIF. GIFs become MP4 clips using one animation cycle. Up to 250 MiB and 10 minutes per clip. Videos are added to {shared ? 'the shared Video Vault' : 'your private library'} and prepared without audio for Studio.</p>
       {!!files.length && !uploading && <p>{files.length} files queued.</p>}
       <button disabled={disabled || uploading || !files.length}>{failures.length && !uploading ? 'Retry failed uploads' : 'Upload videos'}{files.length ? ` (${files.length})` : ''}</button>
       <p role="status">{status}</p>

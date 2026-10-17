@@ -615,7 +615,7 @@ class StudioTest(unittest.TestCase):
         video.with_name('poster.jpg').write_bytes(b'poster')
         db = MagicMock()
         media = SimpleNamespace(provider='upload', metadata_json={'local_path': 'library/test/video.mp4'})
-        with patch('app.api.studio.owned', return_value=media), patch('app.api.studio.FileResponse') as response:
+        with patch('app.api.studio.media_access', return_value=media), patch('app.api.studio.FileResponse') as response:
             response.side_effect = lambda *args, **kwargs: self.assertTrue(db.close.called)
             uploaded_video(1, db)
             db.reset_mock()
